@@ -15,7 +15,10 @@ button:hover{background:#243044}button.on{background:#f2c94c;color:#111;border-c
 .settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 16px;border-top:1px solid #222a35;border-bottom:1px solid #222a35;min-height:52px}
 .settings label{display:flex;gap:6px;align-items:center}
 .settings input{width:96px;background:#0d1117;color:#fff;border:1px solid #2d3848;border-radius:4px;padding:4px}
-.formmsg{min-width:260px;height:20px;display:inline-block;color:#6fcf97}.formmsg.err{color:#eb5757}
+.formmsg{min-width:260px;height:20px;display:inline-block;color:#6fcf97}.formmsg.err{color:#eb5757;height:auto}.formmsg.warn{color:#f2c94c;height:auto}
+.settings input.bad,.settings input[aria-invalid=true]{border-color:#eb5757;box-shadow:0 0 0 1px #eb5757 inset;background:#2a1215}
+.settings input.dirty{border-color:#f2c94c}
+:focus-visible{outline:2px solid #8fb3ff;outline-offset:2px}
 main{display:grid;grid-template-columns:660px 1fr;gap:16px;padding:12px 16px}
 canvas{background:#0a0e14;border:1px solid #222a35;width:640px;height:240px;cursor:crosshair}
 .charthead,.listhead{display:flex;gap:14px;align-items:center;height:30px}
@@ -33,7 +36,7 @@ canvas{background:#0a0e14;border:1px solid #222a35;width:640px;height:240px;curs
 
 .howto{margin:8px 16px;font-size:13px;line-height:1.45;color:#bbb}.howto summary{cursor:pointer;color:#ddd}.howto ul{margin:6px 0;padding-left:20px}
 
-.copymsg{display:inline-block;min-width:7em;visibility:hidden;color:#6fcf97}
+.copymsg{display:inline-block;min-width:7em;visibility:hidden;color:#6fcf97}.copymsg.show{visibility:visible}
 
 .pinned{margin:8px 16px;border:1px solid #8a6d1f;border-left:4px solid #f2c94c;border-radius:6px;background:#15130b;padding:8px 12px;height:200px;overflow:hidden;transition:background-color .8s,box-shadow .8s}
 .pinned.flash{background:#2a2412;box-shadow:0 0 0 2px #f2c94c inset}
@@ -134,7 +137,8 @@ button,select,input{touch-action:manipulation}
   .pin-stats{white-space:normal;gap:2px 12px;font-size:12px;min-height:0}
   .pin-steps{columns:1;height:auto;max-height:140px}
   .pin-tools{flex-wrap:wrap;height:auto;white-space:normal}.pin-tools button,.pin-tools select{min-height:38px;padding:6px 10px}
-  .pin-task{flex:1 0 100%}
+  .pin-task{flex:1 0 100%}.pin-task:empty{display:none}
+  .copymsg{min-width:0}.copymsg:not(.show){display:none}
   .board{grid-template-columns:repeat(2,1fr);height:auto;margin:0 10px 6px}
   .board button{height:56px}
   main{display:block;padding:8px 10px}
@@ -175,31 +179,31 @@ button,select,input{touch-action:manipulation}
   <button id="pause">Pause</button>
   <button id="reload">Reload</button>
 </header>
-<section id="pinned" class="pinned" aria-live="polite">
-  <div class="pin-h"><span class="pin-tag">★ Current top strategy</span><b id="pin-name">Waiting for the first confirmed record…</b><span id="pin-sum" class="pin-sum"></span><button id="pin-open" type="button">Open</button><button id="pin-copy" type="button">Copy for Stake</button><span id="pin-copymsg" class="copymsg">Copied</span></div>
+<section id="pinned" class="pinned" aria-label="Current top strategy">
+  <div class="pin-h"><span class="pin-tag">★ Current top strategy</span><b id="pin-name" aria-live="polite">Waiting for the first confirmed record…</b><span id="pin-sum" class="pin-sum"></span><button id="pin-open" type="button">Open</button><button id="pin-copy" type="button">Copy for Stake</button><span id="pin-copymsg" class="copymsg">Copied</span></div>
   <div id="pin-stats" class="pin-stats"></div>
   <div id="pin-gate" class="pin-gate" style="display:none"></div>
   <ol id="pin-steps" class="pin-steps"></ol>
-  <div class="pin-tools"><button id="pin-deep" type="button">Deep check</button><button id="pin-stress" type="button">Stress test</button><button id="pin-simp" type="button">Simplify</button><select id="pin-rng" title="Dice for the deep check"><option value="fast">Fast RNG</option><option value="pf">Stake provably fair</option></select><span class="pbar"><i id="pin-bar"></i></span><span id="pin-task" class="pin-task"></span><button id="pin-offer" type="button" style="visibility:hidden">Send to confirmation</button></div>
+  <div class="pin-tools"><button id="pin-deep" type="button">Deep check</button><button id="pin-stress" type="button">Stress test</button><button id="pin-simp" type="button">Simplify</button><select id="pin-rng" title="Dice for the deep check"><option value="fast">Fast RNG</option><option value="pf">Stake provably fair</option></select><span class="pbar"><i id="pin-bar"></i></span><span id="pin-task" class="pin-task"></span><button id="pin-offer" type="button" hidden>Send to confirmation</button></div>
 </section>
 <div id="board" class="board"></div>
 <section id="compare" class="compare" hidden><div class="listhead"><span><b>Compare</b> <span class="muted small">(2–3 cards, same seeds)</span></span><span id="cmp-chips" class="cmp-chips"></span><span><button id="cmp-go" type="button">Compare</button> <button id="cmp-clear" type="button">Clear</button></span></div>
-  <div id="cmp-body" hidden><canvas id="cmpc" width="900" height="240"></canvas><div class="cmp-ctl small muted"><span id="cmp-legend"></span> · Sample session <button id="cmp-prev" type="button">◀</button> <b id="cmp-seed">1</b> <button id="cmp-next" type="button">▶</button> · solid = median bank after each bet over <span id="cmp-n"></span> sessions, band = 10th–90th percentile, thin = the sample session</div><table id="cmp-table" class="st cmp-table"></table></div></section>
+  <div id="cmp-body" hidden><canvas id="cmpc" width="900" height="240" role="img" aria-label="Compare chart: median bank after each bet for each compared card"></canvas><div class="cmp-ctl small muted"><span id="cmp-legend"></span> · Sample session <button id="cmp-prev" type="button">◀</button> <b id="cmp-seed">1</b> <button id="cmp-next" type="button">▶</button> · solid = median bank after each bet over <span id="cmp-n"></span> sessions, band = 10th–90th percentile, thin = the sample session</div><table id="cmp-table" class="st cmp-table"></table></div></section>
 <div id="price" class="price"></div>
 <div class="bar">
-  <div class="seg" id="ranks"></div>
-  <div class="seg" id="speeds"></div>
+  <div class="seg" id="ranks" role="group" aria-label="Rank"></div>
+  <div class="seg" id="speeds" role="group" aria-label="Speed"></div>
 </div>
 <div id="live" class="live">Starting…</div>
 <div id="famline" class="famline">Families this gen: – · new families this run: – · variants of record: –</div>
-<form id="settings" class="settings" autocomplete="off">
-  <label>Bank $<input id="s-bank" type="number" step="any" min="1" max="1000000"></label>
-  <label>First bet %<input id="s-firstPct" type="number" step="any"></label>
-  <label>Edge %<input id="s-edge" type="number" step="any"></label>
-  <label>Bets per test<input id="s-bets" type="number" step="1"></label>
-  <label>Max conditions<input id="s-maxCond" type="number" step="1" min="0" max="35"></label>
-  <label title="Scoring limit, not a Stake setting: share of sessions whose worst fall from the session peak exceeds this % of the starting bank is penalized; a record may have at most 5% over. 100 = off.">Max drop %<input id="s-maxDrop" type="number" step="any" min="5" max="100"></label>
-  <label title="Bigger wins only: a challenger must beat the record by at least this many score points on the 5,000-session deep check, and the 95% lower bound of the paired gain (same seeds) must be above 0. Default 0.005.">Min gain<input id="s-minGain" type="number" step="any" min="0" max="0.2"></label>
+<form id="settings" class="settings" autocomplete="off" novalidate>
+  <label>Bank $<input id="s-bank" type="number" inputmode="decimal" step="any" min="1" max="1000000" aria-describedby="formmsg" title="Starting bank, $1–$1,000,000"></label>
+  <label>First bet %<input id="s-firstPct" type="number" inputmode="decimal" step="any" min="0.1" max="5" aria-describedby="formmsg" title="Opening bet as a percent of the bank, 0.1–5 (1 = 1%)"></label>
+  <label>Edge %<input id="s-edge" type="number" inputmode="decimal" step="any" min="0" max="5" aria-describedby="formmsg" title="House edge %, 0–5 (Stake dice is 1)"></label>
+  <label>Bets per test<input id="s-bets" type="number" inputmode="numeric" step="1" min="20" max="1000" aria-describedby="formmsg" title="Bets in one test session, whole number 20–1,000"></label>
+  <label>Max conditions<input id="s-maxCond" type="number" inputmode="numeric" step="1" min="0" max="35" aria-describedby="formmsg"></label>
+  <label title="Scoring limit, not a Stake setting: share of sessions whose worst fall from the session peak exceeds this % of the starting bank is penalized; a record may have at most 5% over. 100 = off.">Max drop %<input id="s-maxDrop" type="number" inputmode="decimal" step="any" min="5" max="100" aria-describedby="formmsg"></label>
+  <label title="Bigger wins only: a challenger must beat the record by at least this many score points on the 5,000-session deep check, and the 95% lower bound of the paired gain (same seeds) must be above 0. Default 0.005.">Min gain<input id="s-minGain" type="number" inputmode="decimal" step="any" min="0" max="0.2" aria-describedby="formmsg"></label>
   <label>Exploration<select id="s-exploration"><option>Low</option><option selected>Balanced</option><option>High</option></select></label>
   <button type="button" id="apply">Apply and relearn</button>
   <button type="button" id="newrun">New run</button>
@@ -208,19 +212,19 @@ button,select,input{touch-action:manipulation}
   <button type="button" id="import">Import memory</button>
   <input type="file" id="importfile" accept=".json,application/json" hidden>
   <span id="iomsg" class="formmsg"></span>
-  <span id="formmsg" class="formmsg"></span>
+  <span id="formmsg" class="formmsg" role="status" aria-live="polite"></span>
   <span id="memline" class="formmsg"></span>
 </form>
 
 <main>
   <section class="left">
     <div class="charthead"><span class="key y">■ record (confirmed)</span><span class="key g">■ classic martingale</span><span id="stale" class="stale"></span></div>
-    <canvas id="chart" width="640" height="240"></canvas>
+    <canvas id="chart" width="640" height="240" role="img" aria-label="Score chart of tested cards; the card list below has the same cards"></canvas>
     <div class="listhead"><span>Population</span><button id="showall">Show all</button></div>
     <ol id="list" class="list"></ol>
     <section id="progfold" class="fold collapsed"><button type="button" class="fold-h" data-fold="progfold" aria-expanded="false"><b>Progress, changelog &amp; novel finds <span class="fold-arrow">▸</span></b><span class="fold-sum">across runs</span></button><div class="fold-body">
     <div class="listhead"><span>Progress across runs (best confirmed score per generation)</span><span id="rejects" class="stale"></span></div>
-    <canvas id="progress" width="640" height="110"></canvas>
+    <canvas id="progress" width="640" height="110" role="img" aria-label="Record score over time"></canvas>
     <div class="listhead"><span>Last 10 records: what changed</span></div>
     <ol id="changelog" class="changelog"></ol>
     <div class="listhead"><span>Novel discoveries (confirmed cards from families memory had never seen)</span></div>
@@ -281,6 +285,7 @@ button,select,input{touch-action:manipulation}
 <li><b>Simplify</b>: removes conditions one at a time and keeps a removal when the score on the same 200 fresh sessions does not drop by more than the noise. It runs on its own whenever a new record wins its holdout. The shorter card is only offered; it must pass the normal confirmation and holdout to become the record.</li>
 <li><b>Workers</b>: the search splits each generation's sessions over up to 4 background workers (one fewer than your cores) and books the results in a fixed order, so the result is the same as on one worker, only faster. If workers are blocked it falls back to one worker or the page itself.</li>
 <li><b>Stake-native cards</b> (v9): every card uses only Stake autoplay settings (amount, games, win chance, over/under, Play and Net Gain conditions). There are no bet caps; if the next bet is bigger than the balance the session ends. Bets never go below the opening stake ($0.01 minimum). Max drop, Min bets before a stop, and the rank are Keel-only scoring settings, labelled Keel-only in Copy for Stake.</li>
+<li><b>Last + green $</b> (optional rank, v16; not the default): score = life + dollar-weighted green − ruin, where dollar-weighted green = total won in winning sessions ÷ (total won + total lost in losing sessions). A card that wins small often and loses big (a hit-and-run net-gain stop) can be "green" in most sessions under Last + green but scores low here. Same drop and early-stop penalties as every rank.</li>
 <li><b>Last + green</b> (rank and Analyst focus, v7): score = life + green − ruin, where life here is the share of the table actually played (a stop at bet 250 of 1,000 is 25% life; a stop at bet 1 is 0.1%). Under the <b>Last longer + go green</b> focus (default, saved) the Analyst asks trade-off questions (net-gain stops at several sizes, stops on win streaks, higher win-chance bands with a net-gain stop, capped escalation, stop timing 250 / 400 / 600 / 1000 via “On first streak of T Games, stop autoplay”), only sends on cards that play at least 90% of the table, and the holdout compares its cards on the same combined objective. It reports the trade-off as measured; going green more often is luck plus stopping, never an edge.</li>
 <li><b>Analyst</b> (v6): a rule-based strategy analyst that runs inside the file, offline (no network, no AI service). It works on its own background worker next to the search, at the chosen <b>Pace</b> (Light 25%, Normal 50%, Heavy 100% of that worker). Each experiment asks one question (which condition matters, does a loss-streak stop cut drop, does softer escalation cut ruin, is a win-chance band underexplored, what a stop at the minimum bet does to the house price, swapped actions, untried condition combinations), builds the cards by deliberate edits, plays them on the same rolls (paired), and writes a note with 95% ranges and a verdict: helps, hurts, or no real difference (when the range overlaps zero it says so: that is noise). Cards that clearly score better are sent, labelled <b>from Analyst</b>, into the normal confirmation and holdout; the notebook reports how they fared. <b>Running conclusions</b> pool the evidence across experiments. <b>Explain this card</b> (any open card) removes each condition in turn and reports which ones drive life, ruin, drop, % ahead and price. The notebook and conclusions are saved in memory and included in Export. The Analyst never claims a card beats the house.</li>
 <li>No card beats the house. Keel only shows how little a card that keeps playing gives up.</li>
@@ -365,20 +370,25 @@ K.EXPLORE = {
 };
 K.exploreCfg = function (S) { return K.EXPLORE[S && S.exploration] || K.EXPLORE.Balanced; };
 K.RANGES = { bank: [1, 1000000], firstPct: [0.1, 5], edge: [0, 5], bets: [20, 1000] };
-K.validate = function (s) {
-  var names = { bank: 'Bank', firstPct: 'First bet %', edge: 'Edge %', bets: 'Bets per test' };
-  for (var k in K.RANGES) { var v = Number(s[k]); var r = K.RANGES[k];
-    if (!isFinite(v) || v < r[0] || v > r[1]) return names[k] + ' must be ' + r[0] + '–' + r[1].toLocaleString('en-US') + '.'; }
-  if (Math.round(s.bets) !== Number(s.bets)) return 'Bets per test must be a whole number.';
-  var mc = s.maxCond == null ? 20 : Number(s.maxCond);
-  if (!isFinite(mc) || mc < 0 || mc > 35 || Math.round(mc) !== mc) return 'Max conditions must be a whole number 0–35.';
-  var md = s.maxDrop == null ? 50 : Number(s.maxDrop);
-  if (!isFinite(md) || md < 5 || md > 100) return 'Max drop must be 5–100 (% of starting bank; 100 = off).';
-  if (s.exploration != null && !K.EXPLORE[s.exploration]) return 'Exploration must be Low, Balanced or High.';
-  var mg = s.minGain == null ? K.MIN_GAIN : Number(s.minGain);
-  if (!isFinite(mg) || mg < 0 || mg > 0.2) return 'Min gain must be 0–0.2 (score points a new record must add).';
-  return null;
+// v16: every invalid field with its own message (the form outlines each one); K.validate returns the first.
+K.fieldErrors = function (s) {
+  var out = {}, num = function (v) { return v === '' || v == null ? NaN : Number(v); };
+  var bank = num(s.bank); if (!isFinite(bank) || bank < 1 || bank > 1000000) out.bank = 'Bank must be $1–$1,000,000.';
+  var fp = num(s.firstPct); if (!isFinite(fp) || fp < 0.1 || fp > 5) out.firstPct = 'First bet % must be 0.1–5 (percent of the bank: 1 = 1%' + (isFinite(fp) && fp > 0 && fp < 0.1 ? '; ' + fp + ' is below the 0.1% minimum' : '') + ').';
+  var ed = num(s.edge); if (!isFinite(ed) || ed < 0 || ed > 5) out.edge = 'Edge % must be 0–5 (Stake dice is 1).';
+  var bt = num(s.bets); if (!isFinite(bt) || bt < 20 || bt > 1000 || Math.round(bt) !== bt) out.bets = 'Bets per test must be a whole number 20–1,000' + (isFinite(bt) && bt > 0 && bt < 20 ? ' (' + bt + ' is too short to score a card)' : '') + '.';
+  var mc = s.maxCond == null ? 20 : num(s.maxCond);
+  if (!isFinite(mc) || mc < 0 || mc > 35 || Math.round(mc) !== mc) out.maxCond = 'Max conditions must be a whole number 0–35.';
+  var md = s.maxDrop == null ? 50 : num(s.maxDrop);
+  if (!isFinite(md) || md < 5 || md > 100) out.maxDrop = 'Max drop must be 5–100 (% of starting bank; 100 = off).';
+  if (s.exploration != null && !K.EXPLORE[s.exploration]) out.exploration = 'Exploration must be Low, Balanced or High.';
+  var mg = s.minGain == null ? K.MIN_GAIN : num(s.minGain);
+  if (!isFinite(mg) || mg < 0 || mg > 0.2) out.minGain = 'Min gain must be 0–0.2 (score points a new record must add).';
+  return out;
 };
+// Non-blocking notes: settings that are legal but will not do exactly what was typed.
+K.fieldNotes = function (s) { var out = {}, n = isFinite(Number(s.bank)) && isFinite(Number(s.firstPct)) && Number(s.bank) > 0 ? K.stakeNote(s) : null; if (n) out.firstPct = n; return out; };
+K.validate = function (s) { var e = K.fieldErrors(s), k = Object.keys(e); return k.length ? e[k[0]] : null; };
 // Max condition blocks per card (default 20, 0–50).
 K.maxCond = function (S) { var m = S && S.maxCond != null ? Number(S.maxCond) : 20; if (!isFinite(m)) m = 20; return Math.max(0, Math.min(35, Math.round(m))); };
 // v8 Max drop: scoring constraint (Keel-only, never a Stake setting). Drop = worst drawdown from the session's running peak, as a share of the starting bank (the existing Drop definition).
@@ -447,8 +457,10 @@ K.fires = function (b, c) {
     return false;
   }
   var x = b.metric === 'balance' ? c.bank : b.metric === 'loss' ? c.start - c.bank : c.bank - c.start;
-  var t = b.thr * c.start;
-  switch (b.cmp) { case 'greater than': return x > t; case 'greater than or equal': return x >= t; case 'lower than': return x < t; case 'lower than or equal': return x <= t; }
+  // v16 audit: Stake compares exact decimal amounts; float sums (e.g. 9.8 - 10 = -0.19999999999999929) must not flip
+  // an equality, so values within a billionth of the bank count as equal
+  var t = b.thr * c.start, e = 1e-9 * (c.start > 1 ? c.start : 1);
+  switch (b.cmp) { case 'greater than': return x > t + e; case 'greater than or equal': return x >= t - e; case 'lower than': return x < t - e; case 'lower than or equal': return x <= t + e; }
   return false;
 };
 K.stakeFor = function (st, base, card, start, bank) {
@@ -513,17 +525,21 @@ K.ladder = function (card, S, won, n) {
   return out;
 };
 K.aggregate = function (rs) {
-  var n = rs.length, dsum = 0, played = 0, life = 0, ruin = 0, drop = 0, green = 0, priced = 0, net = 0, stop = 0, stopGreen = 0;
+  var n = rs.length, dsum = 0, played = 0, life = 0, ruin = 0, drop = 0, green = 0, priced = 0, net = 0, stop = 0, stopGreen = 0, up = 0, dn = 0;
   var lim = K.dropLim, br = 0, ds = [];
-  for (var i = 0; i < n; i++) { var r = rs[i]; ds.push(r.drop); if (r.drop > lim + 1e-12) br++; life += r.life; played += r.playedShare == null ? r.life : r.playedShare; ruin += r.bust ? 1 : 0; drop = Math.max(drop, r.drop); dsum += r.drop; green += r.net > 0 ? 1 : 0; priced += r.priced; net += r.net;
+  for (var i = 0; i < n; i++) { var r = rs[i]; ds.push(r.drop); if (r.drop > lim + 1e-12) br++; life += r.life; played += r.playedShare == null ? r.life : r.playedShare; ruin += r.bust ? 1 : 0; drop = Math.max(drop, r.drop); dsum += r.drop; green += r.net > 0 ? 1 : 0; priced += r.priced; net += r.net; if (r.net > 0) up += r.net; else dn -= r.net;
     if (r.stopped) { stop++; if (r.net > 0) stopGreen++; } }
   // stopped: share of sessions ended by Stop autoplay; stopGreen: of those, share that finished ahead
-  return { n: n, life: life / n, played: played / n, ruin: ruin / n, drop: drop, green: green / n, priced: priced / n, sample: net / n, stopped: stop / n, stopGreen: stop ? stopGreen / stop : 0, dropMean: dsum / n, breach: n ? br / n : 0, dropP95: K.pctile(ds, 0.95) };
+  return { n: n, life: life / n, played: played / n, ruin: ruin / n, drop: drop, green: green / n, priced: priced / n, sample: net / n, stopped: stop / n, stopGreen: stop ? stopGreen / stop : 0, dropMean: dsum / n, breach: n ? br / n : 0, dropP95: K.pctile(ds, 0.95), greenD: up + dn > 0 ? up / (up + dn) : 0 };
 };
 K.pctile = function (a, q) { if (!a.length) return 0; var b = a.slice().sort(function (x, y) { return x - y; }); return b[Math.min(b.length - 1, Math.max(0, Math.ceil(q * b.length) - 1))];
 };
-K.RANKS = ['Closest', 'Lasts', 'Green', 'Caliber', 'Custom', 'Last + green'];
+K.RANKS = ['Closest', 'Lasts', 'Green', 'Caliber', 'Custom', 'Last + green', 'Last + green $'];
 K.LG = 'Last + green';
+// v16 optional rank (not the default): like Last + green, but "green" is dollar-weighted: total won in winning sessions /
+// (total won + total lost in losing sessions). Winning small often and losing big (hit-and-run stops) scores low.
+K.LGD = 'Last + green $';
+K.lgdRaw = function (m) { var life = m.played == null ? m.life : m.played, gd = m.greenD != null ? m.greenD : m.green; return life + gd - m.ruin; };
 // Last + green: life = bets actually played / table length (a stop at bet 250 of 1,000 is 0.25 life; a stop at bet 1 is 0.001).
 K.lgRaw = function (m) { var life = m.played == null ? m.life : m.played; return life * 1.0 + m.green * 1.0 - m.ruin * 1.0; };
 K.lgScore = function (m) { return K.lgRaw(m) - K.dropPenalty(m); };
@@ -553,6 +569,7 @@ K.rawScore = function (m, rank) {
     case 'Green': return m.green;
     case 'Custom': return K.customScore(m);
     case 'Last + green': return K.lgRaw(m);
+    case 'Last + green $': return K.lgdRaw(m);
     case 'Caliber': return m.life * 1.2 - m.ruin * 0.35 - m.drop * 0.45 - 0.1 * Math.abs(m.sample + m.priced);
     default: return m.life * 2 - m.ruin - m.drop * 0.5;
   }
@@ -560,7 +577,7 @@ K.rawScore = function (m, rank) {
 // Map a score to the fixed 0-100 chart scale
 K.chartValue = function (m, rank) {
   var s = K.score(m, rank), v;
-  if (rank === 'Closest') v = s / 2; else if (rank === 'Caliber') v = s / 1.2; else if (rank === 'Custom') v = (s + 1) / 2; else if (rank === 'Last + green') v = s / 2; else v = s;
+  if (rank === 'Closest') v = s / 2; else if (rank === 'Caliber') v = s / 1.2; else if (rank === 'Custom') v = (s + 1) / 2; else if (rank === 'Last + green' || rank === 'Last + green $') v = s / 2; else v = s;
   return Math.max(0, Math.min(100, v * 100));
 };
 // v10: no special rule for voluntary exits; a shorter Number of Games or an early stop just lowers life (bets played).
@@ -627,7 +644,7 @@ K.stakeText = function (card, S) {
     'Keel-only (not a Stake setting): Max drop ' + K.maxDropPct(S) + '% of starting bank is a scoring limit for the search' + (K.maxDropPct(S) >= 100 ? ' (off)' : '') + '; Stake cannot enforce it',
     'Stake validity (Keel v12): no clamps — win chance must stay a 2-decimal value in 0.01–98% and the bet must never go below ' + d(base) + ', or the card is rejected');
   var bad = K.invalidText(card, S); if (bad) L.unshift('⚠ ' + bad + ' — DO NOT RUN (Stake stops with “new win chance invalid” or rejects the amount)', '');
-  else L.push('Stake validity: passed ' + K.VAL_GATE + ' simulated sessions with no win-chance or amount clamp');
+  else L.push('Stake validity: passed ' + K.VAL_GATE + ' simulated sessions' + (card.gd && card.gd.n >= K.VAL_GATE ? ' and the ' + Number(card.gd.n).toLocaleString('en-US') + '-session deep check' : '') + ' with no win-chance or amount clamp' + (card.gd && card.gd.n ? '' : ' (not deep-checked yet: rare paths can still reach an invalid win chance; run Deep check first)'));
   return L.join('\n');
 };
 function fmt(x) { return (Math.round(x * 100) / 100).toString(); }
@@ -1458,7 +1475,8 @@ K.Search.prototype.learnStep = function () {
 // condition minus without, which feeds the per-feature stats and the ridge rows like an A/B result.
 K.FIRE_ON = true; K.FIRE_SEEDS = 6; K.FIRE_ABL = 3; K.FIRE_W = 25; K.FIRE_KEYS = 200;
 K.fireKey = function (b) { return (b.kind === 'play' ? (b.mode === 'every' ? 'every N ' : b.mode + ' N ') + b.on : b.metric + ' ' + b.cmp + ' ' + K.thrBucket(b.thr) + ' of bank') + ' → ' + K.ACTION_LABEL(b.action); };
-K.sessVal = function (r) { return r.life + (r.net > 0 ? 1 : 0) - (r.bust ? 1 : 0); };
+// v16: per-session credit in the units of the active rank (identical to the old formula under Last + green)
+K.sessVal = function (r, rank) { if (!rank || rank === K.LG) return (r.playedShare == null ? r.life : r.playedShare) + (r.net > 0 ? 1 : 0) - (r.bust ? 1 : 0); return K.rawScore(K.aggregate([r]), rank); };
 K.fireLog = function (card, S, seeds) { var nb = card.blocks.length, F = card.blocks.map(function () { return { fires: 0, sess: 0, dBank: 0, dN: 0, greenF: 0 }; }), runs = [];
   seeds.forEach(function (sd) { var ev = [], tr = [], seen = {}, r = K.session(card, S, K.rng(sd), tr, { onFire: function (j, g, bank) { ev.push([j, g, bank]); } });
     ev.forEach(function (e) { var f = F[e[0]]; f.fires++; if (!seen[e[0]]) { seen[e[0]] = 1; f.sess++; if (r.net > 0) f.greenF++; } var k = Math.min(tr.length, e[1] + K.FIRE_W); if (k > e[1]) { f.dBank += (tr[k - 1].bank - e[2]) / S.bank; f.dN++; } });
@@ -1470,12 +1488,12 @@ K.Search.prototype.fireStep = function () {
   var seeds = [], sd0 = Math.floor(r() * 4294967295); for (var i = 0; i < K.FIRE_SEEDS; i++) seeds.push((sd0 + i * 2654435761) >>> 0);
   var t0 = Date.now(), lg = K.fireLog(card, S, seeds), n = K.FIRE_SEEDS, ses = n, fired = []; lg.F.forEach(function (f, j) { if (f.fires) fired.push(j); });
   for (var q = fired.length - 1; q > 0; q--) { var w = Math.floor(r() * (q + 1)), tmp = fired[q]; fired[q] = fired[w]; fired[w] = tmp; }
-  var FL = L.fire || (L.fire = {}), cf = K.features(card);
+  var FL = L.fire || (L.fire = {}), cf = K.features(card), o = K.objFor(card, this.rank, S);
   lg.F.forEach(function (f, j) { if (!f.fires) return; var b = card.blocks[j], k = K.fireKey(b), e = FL[k] || (FL[k] = { fires: 0, sess: 0, seen: 0, dBank: 0, dN: 0, n: 0, s: 0, s2: 0 }); e.fires += f.fires; e.sess += f.sess; e.dBank += f.dBank; e.dN += f.dN; });
   lg.F.forEach(function (f, j) { if (f.fires) return; var k = K.fireKey(card.blocks[j]), e = FL[k] || (FL[k] = { fires: 0, sess: 0, seen: 0, dBank: 0, dN: 0, n: 0, s: 0, s2: 0 }); e.seen += n; });
   lg.F.forEach(function (f, j) { if (f.fires) { var e = FL[K.fireKey(card.blocks[j])]; e.seen += n; } });
   fired.slice(0, K.FIRE_ABL).forEach(function (j) { var x = JSON.parse(JSON.stringify(card)); x.blocks.splice(j, 1);
-    var d = 0, d2 = 0; seeds.forEach(function (sd, i) { var ra = lg.runs[i], rb = K.session(x, S, K.rng(sd)), v = K.sessVal(ra) - K.sessVal(rb); d += v; d2 += v * v; }); ses += n;
+    var d = 0, d2 = 0; seeds.forEach(function (sd, i) { var ra = lg.runs[i], rb = K.session(x, S, K.rng(sd)), v = K.sessVal(ra, o) - K.sessVal(rb, o); d += v; d2 += v * v; }); ses += n;
     var m = d / n, e = FL[K.fireKey(card.blocks[j])]; e.n += n; e.s += d; e.s2 += d2;
     var xf = K.features(x), gone = cf.filter(function (q) { return xf.indexOf(q) < 0; }), came = xf.filter(function (q) { return cf.indexOf(q) < 0; });
     gone.forEach(function (q) { K.lAdd(L, q, m, 1); });
@@ -1562,7 +1580,7 @@ K.autoTrim = function (card, S, rank, seed, n) { n = n || K.TRIM_N; var seeds = 
   while (changed && tests < K.TRIM_MAX) { changed = false;
     for (var k = cur.blocks.length - 1; k >= 0 && tests < K.TRIM_MAX; k--) { var cand = JSON.parse(JSON.stringify(cur)), gone = cand.blocks.splice(k, 1)[0], gk = JSON.stringify(gone) + '|' + cur.blocks.length; if (kept[gk] || !K.validCard(cand, S)) continue;
       var cr = play(cand); sess += n; tests++; var d = K.key(cand, K.aggregate(cr), rank, S) - K.key(cur, K.aggregate(curRuns), rank, S), pv = 0, pv2 = 0;
-      for (var q = 0; q < n; q++) { var dv = K.sessVal(cr[q]) - K.sessVal(curRuns[q]); pv += dv; pv2 += dv * dv; } var se = n > 1 ? Math.sqrt(Math.max(0, (pv2 - pv * pv / n) / (n - 1)) / n) : 0;
+      for (var q = 0; q < n; q++) { var dv = K.sessVal(cr[q], rank) - K.sessVal(curRuns[q], rank); pv += dv; pv2 += dv * dv; } var se = n > 1 ? Math.sqrt(Math.max(0, (pv2 - pv * pv / n) / (n - 1)) / n) : 0;
       // remove only when it truly does not change the result (score and per-session outcomes within tol) or removing it clearly helps
       if ((Math.abs(d) <= K.TRIM_TOL && se <= K.TRIM_TOL) || d > K.TRIM_TOL + K.Z95 * Math.max(se, K.TRIM_TOL)) { cur = cand; curRuns = cr; changed = true; removed.push(K.sentence(gone, null, S.bank).replace(/\.$/, '') + ' (removing it ' + (d > K.TRIM_TOL ? 'raised' : 'did not change') + ' the score on the same seeds: ' + (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(3) + ')'); } else kept[gk] = 1; } }
   return { card: cur, from: from, to: cur.blocks.length, removed: removed, sessions: sess, n: n }; };
@@ -2399,8 +2417,8 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
   // segmented controls
   function seg(el, items, cur, onpick) {
     el.innerHTML = '';
-    items.forEach(function (it) { var b = document.createElement('button'); b.textContent = it; b.type = 'button'; if (it === cur) b.className = 'on';
-      b.onclick = function () { [].forEach.call(el.children, function (c) { c.className = ''; }); b.className = 'on'; onpick(it); }; el.appendChild(b); });
+    items.forEach(function (it) { var b = document.createElement('button'); b.textContent = it; b.type = 'button'; if (it === cur) b.className = 'on'; b.setAttribute('aria-pressed', it === cur ? 'true' : 'false');
+      b.onclick = function () { [].forEach.call(el.children, function (c) { c.className = ''; c.setAttribute('aria-pressed', 'false'); }); b.className = 'on'; b.setAttribute('aria-pressed', 'true'); onpick(it); }; el.appendChild(b); });
   }
   seg($('ranks'), K.RANKS, rank, function (r) { rank = r; try { lsSet('keel.rank.v1', r); } catch (e) {} $('custom').classList.toggle('dim', r !== 'Custom'); worker.postMessage({ type: 'rank', rank: r }); paintList(); paintChart(); paintProgress(currentMemory()); if (openCard) paintDetail(openCard); });
   seg($('speeds'), ['Slow', 'Steady', 'Brisk', 'Fast', 'Full'], speed, function (s) { speed = s; worker.postMessage({ type: 'speed', speed: s }); });
@@ -2417,14 +2435,30 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
     worker.postMessage({ type: 'start', runId: runId, settings: settings, rank: rank, speed: speed, hall: K.sanitizeHall(mem.hall).map(function (h) { return K.trimCard(h, K.maxCond(settings)); }), memory: mem, seed: (Math.random() * 4294967295) >>> 0 });
     if (paused) worker.postMessage({ type: 'pause', paused: true });
   }
-  function msg(text, err) { var m = $('formmsg'); m.textContent = text; m.className = 'formmsg' + (err ? ' err' : ''); }
-  function readForm() { var s = {}; ['bank', 'firstPct', 'edge', 'bets', 'maxCond', 'maxDrop', 'minGain'].forEach(function (k) { s[k] = Number($('s-' + k).value); }); s.exploration = $('s-exploration').value; s.custom = K.sanitizeCustom(settings.custom); s.analyst = settings.analyst; return s; }
+  function msg(text, err) { var m = $('formmsg'); m.textContent = text; m.className = 'formmsg' + (err === 'warn' ? ' warn' : err ? ' err' : ''); }
+  var FORM_KEYS = ['bank', 'firstPct', 'edge', 'bets', 'maxCond', 'maxDrop', 'minGain'];
+  // v16: an empty or unparseable box (type=number gives '' for text like "1,5") is NaN, so it is reported, never read as 0
+  function readForm() { var s = {}; FORM_KEYS.forEach(function (k) { var el = $('s-' + k), v = el.value; s[k] = v === '' || (el.validity && el.validity.badInput) ? NaN : Number(v); }); s.exploration = $('s-exploration').value; s.custom = K.sanitizeCustom(settings.custom); s.analyst = settings.analyst; return s; }
   $('s-exploration').onchange = function () { settings.exploration = this.value; lsSet(LS_SET, JSON.stringify(settings)); msg('Exploration ' + this.value + ' saved. It applies from the next run (New run).'); };
+  // v16: live per-field check. Bad boxes get a red outline + aria-invalid and the message lists every problem; edited but
+  // unapplied boxes get a yellow outline. Nothing typed is ever silently reverted or ignored.
+  function formState() { var s = readForm(), fe = K.fieldErrors(s), notes = K.fieldNotes(s), dirty = [];
+    FORM_KEYS.forEach(function (k) { var el = $('s-' + k), bad = !!fe[k], cur = settings[k] != null ? settings[k] : K.DEFAULTS[k], d = !bad && Number(s[k]) !== Number(cur);
+      el.classList.toggle('bad', bad); el.classList.toggle('dirty', d); el.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (d || bad) dirty.push(k); });
+    return { s: s, fe: fe, notes: notes, dirty: dirty, errs: FORM_KEYS.filter(function (k) { return fe[k]; }).map(function (k) { return fe[k]; }) }; }
+  var LABEL = { bank: 'Bank', firstPct: 'First bet %', edge: 'Edge %', bets: 'Bets per test', maxCond: 'Max conditions', maxDrop: 'Max drop %', minGain: 'Min gain' };
+  function formCheck() { var f = formState(), nk = Object.keys(f.notes);
+    if (f.errs.length) msg((f.errs.length > 1 ? f.errs.length + ' settings need fixing: ' : '') + f.errs.join(' ') + ' Not applied.', true);
+    else if (f.dirty.length) msg('Edited, not applied yet: ' + f.dirty.map(function (k) { return LABEL[k]; }).join(', ') + '. Press Apply and relearn to use ' + (f.dirty.length > 1 ? 'them' : 'it') + '.' + (nk.length ? ' ' + f.notes[nk[0]] : ''), 'warn');
+    else msg(nk.length ? f.notes[nk[0]] : '', nk.length ? 'warn' : false);
+    return f; }
+  FORM_KEYS.forEach(function (k) { $('s-' + k).addEventListener('input', formCheck); $('s-' + k).addEventListener('change', formCheck); });
   function restart(apply, forget) {
-    var s = readForm(), e = K.validate(s);
-    if (apply) { if (e) { msg(e, true); return; } settings = s; K.setMaxDrop(s); lsSet(LS_SET, JSON.stringify(s)); }
-    else if (e) fillForm();
-    start(!!forget); var nt = K.stakeNote(settings); msg((forget ? 'Memory forgotten. New search started' : 'New search started') + (nt ? '. ' + nt : ''));
+    var f = formState(), e = f.errs.length ? f.errs.join(' ') : null;
+    if (apply) { if (e) { formCheck(); var fb = FORM_KEYS.filter(function (k) { return f.fe[k]; })[0]; if (fb) $('s-' + fb).focus(); return; } settings = f.s; K.setMaxDrop(f.s); lsSet(LS_SET, JSON.stringify(f.s)); }
+    start(!!forget); var nt = K.stakeNote(settings), head = (forget ? 'Memory forgotten. New search started' : 'New search started') + (apply ? ' with the new settings' : '');
+    if (!apply && f.dirty.length) { msg(head + ' with the saved settings (bank $' + settings.bank + ', first bet ' + settings.firstPct + '%, ' + settings.bets + ' bets). Your edits to ' + f.dirty.map(function (k) { return LABEL[k]; }).join(', ') + ' were NOT used: ' + (e ? e + ' Fix ' + (f.errs.length > 1 ? 'them' : 'it') + ', then press Apply and relearn.' : 'press Apply and relearn to use them.'), e ? true : 'warn'); return; }
+    formState(); msg(head + (nt ? '. ' + nt : '') + '.');
   }
   $('apply').onclick = function () { restart(true); };
   $('newrun').onclick = function () { restart(false, false); };
@@ -2519,7 +2553,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
     var lad = function (a) { return a.map(function (x) { return x === null ? 'bank can’t cover' : x === 'stop' ? 'autoplay stops' : money(x); }).join(' → '); };
     var esc = function (s) { return String(s).replace(/[&<>]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]; }); };
     var vbad = K.invalidText(c, settings);
-    d.innerHTML = '<h2>' + esc(c.name) + (held ? ' (held)' : '') + '</h2>' + (vbad ? '<p class="invalid">' + esc(vbad) + '</p>' : '<p class="valid small">✓ Stake-valid: ' + K.VAL_GATE + ' simulated sessions, no win-chance or amount clamp.</p>') +
+    d.innerHTML = '<h2>' + esc(c.name) + (held ? ' (held)' : '') + '</h2>' + (vbad ? '<p class="invalid">' + esc(vbad) + '</p>' : '<p class="valid small">✓ Stake-valid: ' + K.VAL_GATE + ' simulated sessions' + (c.gd && c.gd.n ? ' + ' + Number(c.gd.n).toLocaleString('en-US') + '-session deep check' : ' (not deep-checked yet)') + ', no win-chance or amount clamp.</p>') +
       '<div class="muted">' + c.chance.toFixed(2) + '% roll ' + c.dir + ' ' + (c.dir === 'under' ? K.underTarget(t).toFixed(2) : K.overTarget(t).toFixed(2)) + ' · Stake-native (no bet caps; a bet bigger than the balance ends the session) · ' + (c.games ? 'exits after ' + c.games + ' games (voluntary exit)' : 'plays the whole table') + '</div>' +
       '<ol>' + steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
       '<div class="kv"><span>Payout</span><b>' + mult.toFixed(4) + '×</b><span>Opening stake</span><b>' + money(base) + ' (' + settings.firstPct + '% of ' + money(settings.bank) + ')</b>' +
@@ -2544,10 +2578,10 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
   function oddsHtml(c) { var o = oddsOf(c); return '<div class="odds"><h3>Session odds <span class="muted small">(' + o.n.toLocaleString('en-US') + ' simulated sessions, $' + settings.bank + ' bank)</span></h3><div class="kv">' + K.oddsLines(o).map(function (l) { return '<span>' + l[0] + '</span><b>' + escH(l[1]) + '</b>'; }).join('') + '</div><p class="muted small">Luck spreads results around the average; the edge cost is the only number every session pays.</p></div>'; }
   function copyText(txt, mid) {
     mid = mid || 'copymsg';
-    var shown = function () { var m = $(mid); if (!m) return; m.textContent = 'Copied'; m.style.visibility = 'visible'; clearTimeout(copyText.t); copyText.t = setTimeout(function () { m.style.visibility = 'hidden'; }, 1500); };
+    var shown = function () { var m = $(mid); if (!m) return; m.textContent = 'Copied'; m.classList.add('show'); clearTimeout(copyText.t); copyText.t = setTimeout(function () { m.classList.remove('show'); }, 1500); };
     var fallback = function () { var ta = document.createElement('textarea'); ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;width:1px;height:1px';
       document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, txt.length); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta);
-      if (ok) shown(); else { var m = $(mid); if (m) { m.textContent = 'Copy blocked'; m.style.visibility = 'visible'; } } };
+      if (ok) shown(); else { var m = $(mid); if (m) { m.textContent = 'Copy blocked'; m.classList.add('show'); } } };
     window.__lastCopy = txt;
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(shown, fallback); else fallback();
   }
@@ -2667,7 +2701,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
   function deepOf(c) { return c && (deepRes[c.id] || c.deep || memDeep[c.id]) || null; }
   function ci(x, f) { f = f || pct; return f(x.m != null ? x.m : x.p) + ' [' + f(x.lo) + '–' + f(x.hi) + ']'; }
   function sgn(x) { return (x >= 0 ? '+' : '') + (x * 100).toFixed(2) + '%'; }
-  function deepLine(d) { return 'Deep check (' + d.n.toLocaleString('en-US') + ', ' + (d.mode === 'pf' ? 'Stake dice' : 'fast RNG') + '): life ' + ci(d.life) + ' · ruin ' + ci(d.ruin) + ' · drop ' + ci(d.drop) + ' · ahead ' + ci(d.green) + (d.breach && K.maxDropPct(settings) < 100 ? ' · over max drop ' + ci(d.breach) + ' · 95th-pct drop ' + pct(d.dropP95) : '') + ' · mean ' + ci(d.net, sgn); }
+  function deepLine(d) { return (d.clamps ? '⚠ NOT STAKE-VALID: ' + d.clamps.toLocaleString('en-US') + ' of ' + d.n.toLocaleString('en-US') + ' sessions hit an invalid win chance or amount — DO NOT RUN. ' : '') + 'Deep check (' + d.n.toLocaleString('en-US') + ', ' + (d.mode === 'pf' ? 'Stake dice' : 'fast RNG') + '): life ' + ci(d.life) + ' · ruin ' + ci(d.ruin) + ' · drop ' + ci(d.drop) + ' · ahead ' + ci(d.green) + (d.breach && K.maxDropPct(settings) < 100 ? ' · over max drop ' + ci(d.breach) + ' · 95th-pct drop ' + pct(d.dropP95) : '') + ' · mean ' + ci(d.net, sgn); }
   function pinMsg(t) { var el = $('pin-task'); if (el) el.textContent = t; }
   function progressText(t) { return KIND[t.kind] + (t.auto ? ' (auto, new record)' : '') + ': ' + (t.kind === 'simplify' ? 'trial ' + t.done + ' of ~' + t.total : t.done.toLocaleString('en-US') + ' / ' + t.total.toLocaleString('en-US') + ' sessions'); }
   function paintTask(id) {
@@ -2680,7 +2714,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
       var simpTxt = sr ? (sr.to < sr.from ? 'Simplified: ' + sr.from + ' → ' + sr.to + ' conditions (score ' + sr.scoreOrig.toFixed(3) + ' → ' + sr.scoreNew.toFixed(3) + ' on ' + sr.n + ' paired sessions)' + (sr.offered ? ', sent to confirmation.' : '.') : 'Simplify: all ' + sr.from + ' conditions matter.') : '';
       var txt = pt ? progressText(pt) : last === 'simplify' && sr ? simpTxt : last === 'stress' && stressRes[fid] ? 'Stress test done: ' + stressRes[fid].rows.slice(1).map(function (r) { return r.key + ' ruin ' + pct(r.ruin); }).join(' · ') + ' (table in the card panel)' : d ? deepLine(d) : sr ? simpTxt : fc ? 'Deep check runs 5,000 sessions with 95% intervals; Stress reruns it under harder conditions.' : '';
       pinMsg(who + txt);
-      $('pin-offer').style.visibility = !pt && sr && !sr.offered && sr.to < sr.from ? 'visible' : 'hidden';
+      $('pin-offer').hidden = !(!pt && sr && !sr.offered && sr.to < sr.from);
     }
     if (openCard && openCard.id === id && $('d-tools')) paintTools(openCard);
   }
