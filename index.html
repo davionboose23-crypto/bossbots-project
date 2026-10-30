@@ -298,7 +298,7 @@ img,video,canvas,svg,table,pre,textarea,select,input{max-width:100%}
 <li><b>Deep check</b> (gold panel or any open card): 5,000 sessions in the background with 95% intervals: Wilson intervals for ruin and finished-ahead, normal intervals for life, mean drop and mean result. The result is saved on the card and in memory (and exported). It can use the fast RNG or Stake's provably fair dice.</li>
 <li><b>Stress test</b>: replays the card on the same 1,000 seeds under half the bank (same dollar opening stake), twice as many bets, a forced 12-loss streak at a random point, and a 2% edge, and shows how life, ruin and drop change.</li>
 <li><b>Stake's dice / Replay on seeds</b>: Stake makes each roll from HMAC-SHA256(server seed, "client seed:nonce:0"), turns the first 4 bytes into a number between 0 and 1, and the roll is that × 10001 / 100 (00.00–100.00). Keel computes this itself (no browser crypto needed), so a replay can be checked roll by roll on Stake's verifier. Only use a server seed that Stake has already revealed (after rotating); the hashed seed shown should match Stake's.</li>
-<li><b>Simplify</b>: removes conditions one at a time and keeps a removal when the score on the same 200 fresh sessions does not drop by more than the noise. It runs on its own whenever a new record wins its holdout. The shorter card is only offered; it must pass the normal confirmation and holdout to become the record. <b>Auto-Simplify</b> (automatic, on each holdout winner) removes conditions that never fired in 300 sessions or made no difference within ±0.002 on 120 (a stop-loss that ever fired is never removed), and is dropped (the original kept) if the shorter card scores lower on the same 60 holdout sessions or has a higher ruin, over-max-drop or 95th-percentile drop; the pinned card then says “Simplified: removed N conditions … score unchanged (±x) on the same 60 holdout sessions”, <i>Show removed</i> lists them and <i>Show original</i> switches the steps and Copy for Stake back to the unsimplified card. Its purpose is a shorter card to paste, not a higher score.</li>
+<li><b>Simplify</b>: removes conditions one at a time and keeps a removal when the score on the same 200 fresh sessions does not drop by more than the noise. It runs on its own whenever a new record wins its holdout. The shorter card is only offered; it must pass the normal confirmation and holdout to become the record. <b>Auto-Simplify</b> (automatic, on each holdout winner; since v17.1 also on one Goals-board or side-list card every 25 generations, kept only if it is just as good on 120 fresh paired sessions with no more ruin, breach or drop) removes conditions that never fired in 300 sessions or made no difference within ±0.002 on 120 (a stop-loss that ever fired is never removed), and is dropped (the original kept) if the shorter card scores lower on the same 60 holdout sessions or has a higher ruin, over-max-drop or 95th-percentile drop; the pinned card then says “Simplified: removed N conditions … score unchanged (±x) on the same 60 holdout sessions”, <i>Show removed</i> lists them and <i>Show original</i> switches the steps and Copy for Stake back to the unsimplified card. Its purpose is a shorter card to paste, not a higher score.</li>
 <li><b>Workers</b>: the search splits each generation's sessions over up to 4 background workers (one fewer than your cores) and books the results in a fixed order, so the result is the same as on one worker, only faster. If workers are blocked it falls back to one worker or the page itself.</li>
 <li><b>Stake-native cards</b> (v9): every card uses only Stake autoplay settings (amount, games, win chance, over/under, Play and Net Gain conditions). There are no bet caps; if the next bet is bigger than the balance the session ends. Bets never go below the opening stake ($0.01 minimum). Max drop, Min bets before a stop, and the rank are Keel-only scoring settings, labelled Keel-only in Copy for Stake.</li>
 <li><b>Last + green $</b> (the default rank since v16.1; the Analyst, the record and the deep check use it unless you pick another rank): score = life + dollar-weighted green − ruin, where dollar-weighted green = total won in winning sessions ÷ (total won + total lost in losing sessions). A card that wins small often and loses big (a hit-and-run net-gain stop) can be "green" in most sessions under Last + green but scores low here. Same drop and early-stop penalties as every rank.</li>
@@ -356,6 +356,8 @@ K.tickets = function (chance) { return Math.min(9800, Math.max(1, Math.round(cha
 K.underTarget = function (t) { return t / 100; };
 K.overTarget = function (t) { return (10000 - t) / 100; };
 K.multiplier = function (t, edge) { return (10000 * (1 - edge / 100)) / t; };
+// v17.1: shown the way Stake's dice panel shows it: 4 decimals, cut (not rounded), e.g. 7% → 14.1428×, 49.5% → 2.0000×
+K.multText = function (t, edge) { return (Math.floor(K.multiplier(t, edge) * 10000 + 1e-7) / 10000).toFixed(4); };
 K.trueLoss = function (edge) { return (1 + 100 * edge) / 10001; };
 K.wins = function (face, t, dir) { return dir === 'over' ? face > 10000 - t : face < t; };
 K.rng = function (seed) { var a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
@@ -425,7 +427,8 @@ K.dropLim = 0.5;
 K.setMaxDrop = function (S) { K.dropLim = K.maxDropPct(S) / 100; return K.dropLim; };
 K.BREACH_MAX = 0.05;
 K.breachOK = function (m) { return !m || K.dropLim >= 1 || !(m.breach > K.BREACH_MAX + 1e-12); };
-K.dropPenalty = function (m) { if (!m || K.dropLim >= 1 || m.breach == null) return 0; var p = m.breach; if (m.dropP95 > K.dropLim + 1e-12) p += 0.5 + 2 * (m.dropP95 - K.dropLim); return p; };
+K.dropPenalty = function (m) { if (!m || K.dropLim >= 1 || m.breach == null) return 0; var p = m.breach; if (m.dropP95 > K.dropLim + 1e-12) { var ex = m.dropP95 - K.dropLim; p += (K.DROP_SMOOTH > 0 ? Math.min(0.5, K.DROP_SMOOTH * ex) : 0.5) + 2 * ex; } return p; };
+K.DROP_SMOOTH = 0; // v17.1 knob: >0 ramps the over-limit jump in (0.5 reached at 0.5/k over the limit); 0 = the v17 step
 K.trimCard = function (c, max) { if (c && c.blocks && c.blocks.length > max) c.blocks = c.blocks.slice(0, max); return c; };
 
 // Apply one action. st: {amount, chance, dir}; base: opening stake; card: base card
@@ -657,7 +660,7 @@ K.stakeText = function (card, S) {
   var L = ['Amount: ' + usd(base), 'Number of Games: ' + games,
     'Win Chance: ' + (t / 100).toFixed(2) + '%',
     (card.dir === 'over' ? 'Roll Over: ' + K.overTarget(t).toFixed(2) : 'Roll Under: ' + K.underTarget(t).toFixed(2)),
-    'Winnings multiplier: ' + K.multiplier(t, S.edge).toFixed(4) + 'x'];
+    'Winnings multiplier: ' + K.multText(t, S.edge) + 'x'];
   card.blocks.forEach(function (b, i) {
     L.push('', 'Condition ' + (i + 1) + ': ' + (b.kind === 'play' ? 'Play Condition' : 'Net Gain Condition'));
     if (b.kind === 'play') L.push('On ' + K.STAKE_PLAY[b.mode] + ' ' + b.n + ' ' + K.STAKE_ON[b.on]);
@@ -801,13 +804,13 @@ K.goalValue = function (g, m) { // higher is better
 };
 K.updateBoard = function (board, cards, skey) {
   if (!board || board.skey !== skey) board = { skey: skey };
-  cards.forEach(function (c) { if (!c.cm || c.cm.n < 18 || K.lifeOf(c.cm) < K.EARLY || !K.validCard(c)) return;
+  cards.forEach(function (c) { if (!c.cm || c.cm.n < 18 || K.lifeOf(c.cm) < K.EARLY || !K.validShown(c)) return;
     K.GOALS.forEach(function (g) { var cur = board[g[0]]; if (!cur || K.goalValue(g[0], c.cm) > K.goalValue(g[0], cur.cm) + 1e-12) board[g[0]] = strip(c, true); }); });
   return board;
 };
 K.updateElites = function (elites, cards, rank, S, skey) {
   elites = elites || {};
-  cards.forEach(function (c) { if (!c.cm || K.lifeOf(c.cm) < K.EARLY || !K.validCard(c)) return; var k = K.family(c).key, cur = elites[k];
+  cards.forEach(function (c) { if (!c.cm || K.lifeOf(c.cm) < K.EARLY || !K.validShown(c)) return; var k = K.family(c).key, cur = elites[k];
     if (!cur || cur.skey !== skey || K.key(c, c.cm, rank, S) > K.key(cur, cur.cm, rank, S)) { var x = strip(c, true); x.skey = skey; elites[k] = x; } });
   var keys = Object.keys(elites);
   if (keys.length > 24) { keys.sort(function (a, b) { var A = elites[a], B = elites[b]; return ((B.skey === skey) - (A.skey === skey)) || K.key(B, B.cm, rank, S) - K.key(A, A.cm, rank, S); }); keys.slice(24).forEach(function (k) { delete elites[k]; }); }
@@ -1061,6 +1064,17 @@ K.repair = function (c, S) {
 };
 K.repairStatic = function (c) { var S = K.vS || K.DEFAULTS; for (var k = 0; k < 40 && c; k++) { var is = K.stakeStatic(c, S); if (!is.length) break; var d = {}; is.forEach(function (x) { if (x.i >= 0) d[x.i] = 1; else { c.chance = Math.round(K.clampChance(c.chance) * 100) / 100; c.games = Math.max(0, Math.round(c.games) || 0); if (c.games > 0 && c.games < K.EARLY * S.bets) c.games = 0; } }); c.blocks = c.blocks.filter(function (b, i) { return !d[i]; }); } return c; };
 K.validCard = function (c, S) { return !!c && !c.inv && K.stakeValidate(c, S || K.vS || K.DEFAULTS).valid; };
+// v17.1: cards that are SHOWN or SAVED (list, side lists, best-per-goal board, family elites) must pass the same
+// K.VAL_GATE-session check as the record. Cards with add/subtract win chance or bet-lowering actions were only checked on
+// 8 sessions, and ~15% of those that passed failed on 200 (a clamp Stake would stop on). A failing card is marked invalid.
+// v17.1: cards with risky actions (add/subtract win chance, lower the bet) are re-checked on K.VAL_GATE sessions before
+// they are shown (list, board, elites, side list): ~15% that pass the quick 8-session check fail the longer one.
+// cap = { n: checks left }: the list spends at most K.SHOWN_CAP new long checks per K.SHOWN_EVERY generations (best-ranked
+// first); an unchecked risky card stays off the list until checked (board, elites and side list always check).
+K.SHOWN_CAP = 1; K.SHOWN_EVERY = 4; // one new long check per 4 generations: every generation cost +16% wall time at $10/1%, +58% at $40/5%
+K.validShown = function (c, S, cap) { S = S || K.vS || K.DEFAULTS; if (!K.validCard(c, S)) return false; if (K.valN(c) === K.VAL_N) return true;
+  if (cap) { var sg = K.cardSig(c), seen = cap.seen || {}; if (!seen[sg]) { if (cap.n <= 0) return false; cap.n--; seen[sg] = 1; } } // per-search record, not the shared cache: same list on 1 or many workers
+  var v = K.stakeValidate(c, S, { n: K.VAL_GATE }); if (!v.valid) { c.inv = c.inv || ('Not valid on Stake: ' + v.reasons.join('; ')); return false; } return true; };
 // Generators only ever hand out Stake-valid cards: resample a few times, then repair.
 (function () {
   var rc = K.randomCard, mu = K.mutate, cr = K.cross, nu = K.nudge;
@@ -1321,18 +1335,19 @@ K.Search.prototype.finishGen = function () {
       if (mem.progress.length > 500) mem.progress = mem.progress.filter(function (p, i, a) { return i % 2 === 0 || i >= a.length - 100; }); }
   }
   this.history.push({ gen: this.gen, rec: this.record ? K.chartValue(this.record.cm, rank) : 0, mart: K.chartValue(this.mart.m, rank), card: this.record, martM: this.mart.m });
-  var list = this.sorted(true).filter(function (c) { var m = c.cm || c.m; return !c.inv && (!m || K.lifeOf(m) >= K.EARLY); }).map(function (c) { var x = strip(c, false); x.fam = K.family(c).key; return x; });
+  var vseen = this.vSeen || (this.vSeen = {}), vcap = { n: this.gen % K.SHOWN_EVERY === 0 ? K.SHOWN_CAP : 0, seen: vseen }, list = this.sorted(true).filter(function (c) { var m = c.cm || c.m; return !c.inv && (!m || K.lifeOf(m) >= K.EARLY) && K.validShown(c, S, vcap); }).map(function (c) { var x = strip(c, false); x.fam = K.family(c).key; return x; });
   var pm = this.popMetrics(), fams = pm.counts;
   if (mem) {
     var mf = this.memFams;
     conf.forEach(function (c) { if (!c.cm) return; var k = K.family(c).key; mem.seenFams[k] = (mem.seenFams[k] || 0) + 1;
       // novel discoveries: confirmed (lasted >= 98%, no ruin) cards from families memory had not seen when this run began
-      if (mf[k] || !(c.cm.life >= 0.98) || c.cm.ruin > 0 || !K.validCard(c, S)) return;
+      if (mf[k] || !(c.cm.life >= 0.98) || c.cm.ruin > 0 || !K.validShown(c, S)) return;
       var x = strip(c, true); x.skey = skey; x.found = { run: mem.runs, gen: self.gen };
       var at = mem.novel.findIndex(function (q) { return K.family(q).key === k; });
       if (at >= 0) { if (K.key(x, x.cm, rank, S) > K.key(mem.novel[at], mem.novel[at].cm, rank, S)) { x.found = mem.novel[at].found || x.found; mem.novel[at] = x; } }
       else mem.novel.unshift(x); });
     if (mem.novel.length > K.NOVEL_MAX) { mem.novel.sort(function (a, b) { return K.key(b, b.cm, rank, S) - K.key(a, a.cm, rank, S); }); mem.novel = mem.novel.slice(0, K.NOVEL_MAX); }
+    if (K.SIDE_TRIM && self.gen % K.SIDE_EVERY === 0) self.trimSide(mem);
     if (!mem.seenNiches) mem.seenNiches = {}; this.pop.forEach(function (c) { mem.seenNiches[K.niche(c)] = 1; });
     var nk = Object.keys(mem.seenNiches); if (nk.length > K.NICHE_MAX) nk.slice(0, nk.length - K.NICHE_MAX).forEach(function (k) { delete mem.seenNiches[k]; });
     var sk = Object.keys(mem.seenFams); if (sk.length > 400) { sk.sort(function (a, b) { return mem.seenFams[a] - mem.seenFams[b]; }); sk.slice(0, sk.length - 400).forEach(function (k) { delete mem.seenFams[k]; }); }
@@ -1416,12 +1431,23 @@ K.goalMutate = function (c, r, max) { if (!c) return c; max = max == null ? 35 :
   if (tp != null) { var u = r(); if (u < 0.08) tp = null; else if (u < 0.4) tp = tp * Math.exp(0.35 * K.gauss(r)); } else if (room() && K.goalWant(r, 'tp', 0.15)) tp = K.goalDraw(r, 'tp');
   if (sl != null) { var v = r(); if (v < 0.08) sl = null; else if (v < 0.4) sl = sl * Math.exp(0.3 * K.gauss(r)); } else if (room() && K.goalWant(r, 'sl', 0.15)) sl = K.goalDraw(r, 'sl');
   K.setGoal(c, tp, sl); return K.trimCard(c, max); };
+K.GOAL_FIX = true;
+K.goalBad = function (c) { var bl = c.blocks || [], tps = bl.filter(K.isTP), sls = bl.filter(K.isSL), g = K.goalOf(c), n = tps.length + sls.length;
+  if (tps.length > 1 || sls.length > 1) return 'duplicate'; if (g.tp != null && (g.tp < K.GOAL_TP[0] - 1e-9 || g.tp > K.GOAL_TP[1] + 1e-9)) return 'target out of range';
+  if (g.sl != null && (g.sl < K.GOAL_SL[0] - 1e-9 || g.sl > K.GOAL_SL[1] + 1e-9)) return 'stop-loss out of range';
+  if (n && bl.slice(0, n).some(function (b) { return !K.isTP(b) && !K.isSL(b); })) return 'not at the top'; if (tps.length && sls.length && !K.isTP(bl[0])) return 'order'; return null; };
 (function () {
   var rc = K.randomCard, mu = K.mutate, cr = K.cross;
   var fin = function (c) { var S = K.vS || K.DEFAULTS; if (K.lazy) return K.stakeStatic(c, S).length ? K.repairStatic(c) : c; return K.validCard(c, S) ? c : K.repair(c, S); };
   K.randomCard = function (r, max) { var c = rc.apply(null, arguments); if (max == null) max = 20; var wt = max >= 1 && K.goalWant(r, 'tp', K.GOAL_P * 0.7), ws = max >= 1 && K.goalWant(r, 'sl', K.GOAL_P * 0.6); if (wt || ws) { var x = K.clone(c); x.name = c.name; K.setGoal(x, wt ? K.goalDraw(r, 'tp') : null, ws ? K.goalDraw(r, 'sl') : null); K.trimCard(x, max); c = fin(x); } return c; };
   K.mutate = function (c, r, rate, max) { var x = mu.apply(null, arguments); if (r() < 0.5) { var y = K.goalMutate(JSON.parse(JSON.stringify(x)), r, max == null ? 35 : max); x = fin(y); } return x; };
   K.cross = function (a, b, r, max) { var x = cr.apply(null, arguments), g = K.goalOf(x), n = x.blocks.filter(function (q) { return K.isTP(q); }).length + x.blocks.filter(function (q) { return K.isSL(q); }).length; if (n > (g.tp != null) + (g.sl != null)) { K.setGoal(x, g.tp, g.sl); x = fin(x); } return x; };
+  // v17.1: every mutated / crossed / nudged card keeps its profit target and stop-loss inside the goal ranges, one of each,
+  // at the top (before: ~3.5% of children had a goal out of range, below another condition, or duplicated).
+  var mu2 = K.mutate, cr2 = K.cross, nu2 = K.nudge, gfix = function (x, max) { if (!x || !K.GOAL_FIX || !K.goalBad(x)) return x; var g = K.goalOf(x), y = JSON.parse(JSON.stringify(x)); K.setGoal(y, g.tp, g.sl); K.trimCard(y, max == null ? 35 : max); y = fin(y); return K.goalBad(y) ? x : y; };
+  K.mutate = function (c, r, rate, max) { return gfix(mu2.apply(null, arguments), max); };
+  K.cross = function (a, b, r, max) { return gfix(cr2.apply(null, arguments), max); };
+  if (nu2) K.nudge = function (c, r, max) { return gfix(nu2.apply(null, arguments), max); };
 })();
 // v17 Cushion family: play at a lively win chance A while the session is down less than Y of the bank, switch to a safe
 // win chance B once it is down more than Y (and, optionally, once it is up G or more), back to A when it recovers.
@@ -1670,6 +1696,25 @@ K.Search.prototype.trimChallenger = function (ch, rec, h) {
   x.trim = { from: t.from, to: t.to, removed: t.removed.slice(0, 20), n: t.n, never: t.never, same: t.removed.length - t.never, dHold: dh, nHold: K.HOLDOUT,
     orig: { name: ch.name, chance: ch.chance, dir: ch.dir, games: ch.games, blocks: JSON.parse(JSON.stringify(ch.blocks)) } };
   this.trims = (this.trims || 0) + 1; return x; };
+// v17.1 side-list Auto-Simplify: best-per-goal board and novel cards get the same safe trim as the record (never-fired
+// conditions, or removals that change nothing within ±K.TRIM_TOL on 120 paired sessions; a stop-loss that ever fired is kept),
+// one card per generation. The shorter card is kept only if, on 120 fresh paired sessions, its goal value (board) or score
+// (novel) is not lower by more than K.TRIM_TOL and its ruin, over-max-drop share and 95th-pct drop are not higher.
+K.SIDE_TRIM = true; K.SIDE_EVERY = 25; // one side card per 25 generations: ~3% of the session budget (every gen cost ~16%, every 10th ~8% and +50% wall time at $40 / 5% in the v17.1 bench)
+K.Search.prototype.trimSide = function (mem) {
+  var S = this.S, rank = this.rank, slots = [];
+  if (mem.board) K.GOALS.forEach(function (g) { var x = mem.board[g[0]]; if (x) slots.push({ x: x, g: g[0], put: function (v) { K.GOALS.forEach(function (q) { if (mem.board[q[0]] === x) mem.board[q[0]] = v; }); } }); });
+  (mem.novel || []).forEach(function (x, i) { slots.push({ x: x, g: null, put: function (v) { mem.novel[i] = v; } }); });
+  var sl = slots.filter(function (q) { return q.x.blocks && q.x.blocks.length >= 2 && !q.x.sideTried && !q.x.trim; })[0]; if (!sl) return null;
+  var x = sl.x; x.sideTried = 1; var o = K.objFor(x, rank, S), seed = (0x2545F491 ^ Math.imul(this.gen + 1, 2654435761)) >>> 0;
+  var t = K.autoTrim(x, S, o, seed); this.trimSessions = (this.trimSessions || 0) + t.sessions; if (!t.removed.length) return null;
+  var y = t.card, r0 = [], r1 = [], clamp = false; for (var i = 0; i < K.TRIM_N; i++) { var sd = (seed ^ 0x9E3779B9) + i * 2246822519 >>> 0, a = K.session(x, S, K.rng(sd)), b = K.session(y, S, K.rng(sd)); r0.push(a); r1.push(b); if (b.clamps) clamp = true; }
+  this.trimSessions += 2 * K.TRIM_N; var m0 = K.aggregate(r0), m1 = K.aggregate(r1);
+  var v0 = sl.g ? K.goalValue(sl.g, m0) : K.key(x, m0, o, S), v1 = sl.g ? K.goalValue(sl.g, m1) : K.key(y, m1, o, S);
+  if (clamp || !K.validShown(y, S) || v1 < v0 - K.TRIM_TOL || m1.ruin > m0.ruin || (m1.breach || 0) > (m0.breach || 0) || m1.dropP95 > m0.dropP95 + 0.005) { this.sideTrimFail = (this.sideTrimFail || 0) + 1; return null; }
+  var nx = JSON.parse(JSON.stringify(x)); nx.blocks = JSON.parse(JSON.stringify(y.blocks)); nx.sideTried = 1;
+  nx.trim = { from: t.from, to: t.to, removed: t.removed.slice(0, 20), n: t.n, never: t.never, same: t.removed.length - t.never, dHold: v1 - v0, nHold: K.TRIM_N, side: true, orig: { name: x.name, chance: x.chance, dir: x.dir, games: x.games, blocks: JSON.parse(JSON.stringify(x.blocks)) } };
+  sl.put(nx); this.sideTrims = (this.sideTrims || 0) + 1; return nx; };
 K.trimOriginal = function (rec) { if (!rec || !rec.trim || !rec.trim.orig) return null; var o = JSON.parse(JSON.stringify(rec)), t = rec.trim.orig;
   o.chance = t.chance; o.dir = t.dir; o.games = t.games; o.blocks = JSON.parse(JSON.stringify(t.blocks)); o.name = rec.name + ' (original)'; delete o.trim; delete o.gd; return o; };
 K.trimLine = function (t) { if (!t || !t.removed || !t.removed.length) return '';
@@ -1730,7 +1775,7 @@ K.Search.prototype.gateFinish = function (j) {
 };
 K.Search.prototype.gateStatus = function () { var g = this.gate; if (!g || (!g.cur && !g.q.length)) return null;
   var c = g.cur || g.q[0]; return { name: c.card.name, kind: c.kind, done: g.cur ? g.cur.i : 0, total: K.gateN(), pending: this.gatePending(), queued: g.q.length }; };
-function strip(c, conf) { return JSON.parse(JSON.stringify({ id: c.id, name: c.name, chance: c.chance, dir: c.dir, games: c.games, blocks: c.blocks, m: c.m, cm: c.cm || null, hm: c.hm || null, deep: c.deep || null, gd: c.gd || null, simp: c.simp || null, trim: c.trim || undefined, src: c.src || undefined, learnSrc: c.learnSrc || undefined })); }
+function strip(c, conf) { return JSON.parse(JSON.stringify({ id: c.id, name: c.name, chance: c.chance, dir: c.dir, games: c.games, blocks: c.blocks, m: c.m, cm: c.cm || null, hm: c.hm || null, deep: c.deep || null, gd: c.gd || null, simp: c.simp || null, trim: c.trim || undefined, sideTried: c.sideTried || undefined, src: c.src || undefined, learnSrc: c.learnSrc || undefined })); }
 K.Search.prototype.breed = function () {
   var r = this.r, mx = this.max, st = this.mem && this.mem.stats, self = this, cfg = this.cfg, bp = this.biasP;
   var A = K.adapt(this.stale), rec = this.record, gen = this.gen, locked = gen < cfg.lock, saved = this.saved;
@@ -2653,7 +2698,8 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
     d.innerHTML = '<h2>' + esc(c.name) + (held ? ' (held)' : '') + '</h2>' + (vbad ? '<p class="invalid">' + esc(vbad) + '</p>' : '<p class="valid small">✓ Stake-valid: ' + K.VAL_GATE + ' simulated sessions' + (c.gd && c.gd.n ? ' + ' + Number(c.gd.n).toLocaleString('en-US') + '-session deep check' : ' (not deep-checked yet)') + ', no win-chance or amount clamp.</p>') +
       '<div class="muted">' + c.chance.toFixed(2) + '% roll ' + c.dir + ' ' + (c.dir === 'under' ? K.underTarget(t).toFixed(2) : K.overTarget(t).toFixed(2)) + ' · Stake-native (no bet caps; a bet bigger than the balance ends the session) · ' + (c.games ? 'exits after ' + c.games + ' games (voluntary exit)' : 'plays the whole table') + '</div>' +
       '<ol>' + steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
-      '<div class="kv"><span>Payout</span><b>' + mult.toFixed(4) + '×</b><span>Opening stake</span><b>' + money(base) + ' (' + settings.firstPct + '% of ' + money(settings.bank) + ')</b>' +
+      (c.trim && c.trim.removed && c.trim.removed.length ? '<p class="small muted">' + esc(K.trimLine(c.trim)) + ' Removed: ' + esc(c.trim.removed.join('; ')) + '.</p>' : '') +
+      '<div class="kv"><span>Payout</span><b>' + K.multText(t, settings.edge) + '×</b><span>Opening stake</span><b>' + money(base) + ' (' + settings.firstPct + '% of ' + money(settings.bank) + ')</b>' +
       '<span>Lasted</span><b>' + pct(m.life) + ' of ' + settings.bets + ' bets</b><span>Drop (worst)</span><b>' + pct(m.drop) + ' of bank (fall from the session peak)' + (m.dropP95 != null ? '; 95th pct ' + pct(m.dropP95) : '') + '</b>' +
       '<span>Max drop</span><b>' + (K.maxDropPct(settings) >= 100 ? 'off' : K.maxDropPct(settings) + '% limit · ' + (m.breach != null ? pct(m.breach) + ' of sessions over it' + (m.breach > K.BREACH_MAX + 1e-12 ? ' (above the 5% a record may have)' : '') : 'not measured yet')) + '</b>' +
       '<span>Broke</span><b>' + pct(m.ruin) + ' of sessions</b><span>Green</span><b>' + pct(m.green) + ' finished ahead</b>' +
