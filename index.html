@@ -288,7 +288,7 @@ img,video,canvas,svg,table,pre,textarea,select,input{max-width:100%}
 <li><b>House price vs. sample</b>: the house price is what a card is expected to give up for every dollar wagered. The sample is what these few sessions happened to show; it is noisy, so the house price is the honest number.</li>
 <li><b>Ranks</b>: Closest favors cards that keep playing with few busts and small drops. Lasts favors playing the longest, nothing else. Green favors finishing ahead most often. Caliber balances lasting, busts and drops, and penalizes drifting from the house price. <b>Custom</b> uses your five sliders (saved): a weighted average of life and % finished ahead (counted up) and ruin, drop and house price (counted down; a house price of 10% of the bank per session is the full penalty).</li>
 <li><b>Chart</b>: the yellow line is the confirmed record card; it only moves when a full confirmation beats it. The gray line is classic martingale on the same rolls.</li>
-<li><b>Current top strategy</b> (gold panel): the confirmed record. A card only takes it after a full confirmation <i>and</i> beating the record on 60 fresh holdout sessions neither card was picked on. The gold ★ marks it in the list.</li>
+<li><b>Current top strategy</b> (gold panel): the confirmed record. A card only takes it after a full confirmation <i>and</i> beating the record on 60 fresh holdout sessions neither card was picked on; since v17 a winner keeps playing paired sessions against the record (up to 420) and is dropped as early luck if its gain fades below the Min gain, before the 5,000-session deep check. The gold ★ marks it in the list.</li>
 <li><b>Families</b>: each card is tagged by win-chance band (&lt;10, 10–40, 40–60, 60–90, 90–98), whether it can stop, whether it escalates the amount, and its most-used condition. Near-duplicates are penalised when breeding and no family may fill more than 12 of 64 seats, so the search keeps a spread of styles. The best card of each family is kept in memory.</li>
 <li><b>Search</b>: every card gets 3 sessions, the best 16 race on 6 more, the top 8 get a full confirmation. Each generation also tries small one-setting nudges of the record, and mutation gets stronger the longer nothing beats the record.</li>
 <li><b>Best per goal</b>: the confirmed card that lasts longest, has the smallest drop, finishes ahead most often, and pays the lowest house price per session. Tap one to open it.</li>
@@ -302,6 +302,7 @@ img,video,canvas,svg,table,pre,textarea,select,input{max-width:100%}
 <li><b>Workers</b>: the search splits each generation's sessions over up to 4 background workers (one fewer than your cores) and books the results in a fixed order, so the result is the same as on one worker, only faster. If workers are blocked it falls back to one worker or the page itself.</li>
 <li><b>Stake-native cards</b> (v9): every card uses only Stake autoplay settings (amount, games, win chance, over/under, Play and Net Gain conditions). There are no bet caps; if the next bet is bigger than the balance the session ends. Bets never go below the opening stake ($0.01 minimum). Max drop, Min bets before a stop, and the rank are Keel-only scoring settings, labelled Keel-only in Copy for Stake.</li>
 <li><b>Last + green $</b> (the default rank since v16.1; the Analyst, the record and the deep check use it unless you pick another rank): score = life + dollar-weighted green − ruin, where dollar-weighted green = total won in winning sessions ÷ (total won + total lost in losing sessions). A card that wins small often and loses big (a hit-and-run net-gain stop) can be "green" in most sessions under Last + green but scores low here. Same drop and early-stop penalties as every rank.</li>
+<li><b>Cushion</b> (v17 card family): plays a lively win chance while the session is down less than a set amount, switches to a safe win chance (usually 98%) once it is down more than that (and, in some cards, once it is up by a set amount), and goes back when it recovers. It uses only Stake Net Gain conditions with Set / Reset win chance, so the bet never changes and every card pastes into Stake as is. It does not beat the house: at $10 / 1% it trades a little of the house price for more bets played and more sessions finishing green (about 1.26 on Last + green $ vs about 1.14 for the best single win chance).</li>
 <li><b>Last + green</b> (rank, v7; the default until v16.1, still selectable): score = life + green − ruin, where life here is the share of the table actually played (a stop at bet 250 of 1,000 is 25% life; a stop at bet 1 is 0.1%). Under the <b>Last longer + go green ($-weighted)</b> focus (default, saved; since v16.1 it scores with Last + green $) the Analyst asks trade-off questions (net-gain stops at several sizes, stops on win streaks, higher win-chance bands with a net-gain stop, capped escalation, stop timing 250 / 400 / 600 / 1000 via “On first streak of T Games, stop autoplay”), only sends on cards that play at least 90% of the table, and the holdout compares its cards on the same combined objective. It reports the trade-off as measured; going green more often is luck plus stopping, never an edge.</li>
 <li><b>Analyst</b> (v6): a rule-based strategy analyst that runs inside the file, offline (no network, no AI service). It works on its own background worker next to the search, at the chosen <b>Pace</b> (Light 25%, Normal 50%, Heavy 100% of that worker). Each experiment asks one question (which condition matters, does a loss-streak stop cut drop, does softer escalation cut ruin, is a win-chance band underexplored, what a stop at the minimum bet does to the house price, swapped actions, untried condition combinations), builds the cards by deliberate edits, plays them on the same rolls (paired), and writes a note with 95% ranges and a verdict: helps, hurts, or no real difference (when the range overlaps zero it says so: that is noise). Cards that clearly score better are sent, labelled <b>from Analyst</b>, into the normal confirmation and holdout; the notebook reports how they fared. <b>Running conclusions</b> pool the evidence across experiments. <b>Explain this card</b> (any open card) removes each condition in turn and reports which ones drive life, ruin, drop, % ahead and price. The notebook and conclusions are saved in memory and included in Export. The Analyst never claims a card beats the house.</li>
 <li>No card beats the house. Keel only shows how little a card that keeps playing gives up.</li>
@@ -399,6 +400,8 @@ K.fieldErrors = function (s) {
   var out = {}, num = function (v) { return v === '' || v == null ? NaN : Number(v); };
   var bank = num(s.bank); if (!isFinite(bank) || bank < 1 || bank > 1000000) out.bank = 'Bank must be $1–$1,000,000.';
   var fp = num(s.firstPct); if (!isFinite(fp) || fp < 0.1 || fp > 5) out.firstPct = 'First bet % must be 0.1–5 (percent of the bank: 1 = 1%' + (isFinite(fp) && fp > 0 && fp < 0.1 ? '; ' + fp + ' is below the 0.1% minimum' : '') + ').';
+  // v17: a first bet under $0.01 is an error (it used to be a note and Keel silently bet $0.01, a different card).
+  if (!out.bank && !out.firstPct && bank * fp / 100 < K.MIN_STAKE - 1e-12) out.firstPct = 'First bet ' + fp + '% of $' + bank.toFixed(2) + ' = $' + (bank * fp / 100).toFixed(4) + ' is below the $0.01 Stake minimum. Use at least ' + K.minFirstPct(bank) + '%, or a bigger bank.';
   var ed = num(s.edge); if (!isFinite(ed) || ed < 0 || ed > 5) out.edge = 'Edge % must be 0–5 (Stake dice is 1).';
   var bt = num(s.bets); if (!isFinite(bt) || bt < 20 || bt > 1000 || Math.round(bt) !== bt) out.bets = 'Bets per test must be a whole number 20–1,000' + (isFinite(bt) && bt > 0 && bt < 20 ? ' (' + bt + ' is too short to score a card)' : '') + '.';
   var mc = s.maxCond == null ? 20 : num(s.maxCond);
@@ -412,6 +415,7 @@ K.fieldErrors = function (s) {
 };
 // Non-blocking notes: settings that are legal but will not do exactly what was typed.
 K.fieldNotes = function (s) { var out = {}, n = isFinite(Number(s.bank)) && isFinite(Number(s.firstPct)) && Number(s.bank) > 0 ? K.stakeNote(s) : null; if (n) out.firstPct = n; return out; };
+K.minFirstPct = function (bank) { return Math.max(0.1, Math.ceil(K.MIN_STAKE / bank * 100 * 1000 - 1e-6) / 1000); };
 K.validate = function (s) { var e = K.fieldErrors(s), k = Object.keys(e); return k.length ? e[k[0]] : null; };
 // Max condition blocks per card (default 20, 0–50).
 K.maxCond = function (S) { var m = S && S.maxCond != null ? Number(S.maxCond) : 20; if (!isFinite(m)) m = 20; return Math.max(0, Math.min(35, Math.round(m))); };
@@ -693,7 +697,8 @@ K.classics = function () {
     K.mk('Paroli three', 49.5, 'under', [P('every', 'wins', 1, 'increase amount', 100), P('every streak of', 'wins', 3, 'reset amount'), P('every', 'losses', 1, 'reset amount')]),
     K.mk('Ease off', 49.5, 'under', [P('every', 'losses', 1, 'decrease amount', 50), P('every', 'wins', 1, 'increase amount', 20)]),
     K.mk('Switch after four', 49.5, 'under', [P('every streak of', 'losses', 4, 'switch over/under')]),
-    K.mk('Press the chance', 49.5, 'under', [P('every', 'losses', 1, 'add to win chance', 5), P('every', 'wins', 1, 'reset win chance')])
+    K.mk('Press the chance', 49.5, 'under', [P('every', 'losses', 1, 'add to win chance', 5), P('every', 'wins', 1, 'reset win chance')]),
+    K.cushion('Cushion', 58, 0.2, 98, 0.2)
   ];
 };
 K.martingale = function () { return K.classics()[2]; };
@@ -889,7 +894,7 @@ K.importMemory = function (existing, data, S) {
   var src = data.format === 'keel-memory' ? data.memory : (data.cards || data.hall ? data : null);
   if (!src || typeof src !== 'object') throw new Error('Not a BossBots memory file.');
   if (data.version != null && (!isFinite(Number(data.version)) || Number(data.version) > K.MEM_VERSION)) throw new Error('Memory file version ' + data.version + ' is newer than this page understands.');
-  var max = K.maxCond(S), skey = K.settingsKey(S || K.DEFAULTS), rank = 'Closest';
+  var max = K.maxCond(S), skey = K.settingsKey(S || K.DEFAULTS), rank = K.LGD; // v17: same rank as the search default
   var inc = K.sanitizeMemory(src, max), cur = K.sanitizeMemory(existing, max);
   var seen = {}, sigs = {}, added = 0;
   var all = function (m) { var a = m.cards.concat(m.hall); Object.keys(m.elites).forEach(function (k) { a.push(m.elites[k]); }); if (m.record) a.push(m.record); return a; };
@@ -913,7 +918,9 @@ K.importMemory = function (existing, data, S) {
   cur.hall = K.sanitizeHall(hall.filter(function (h, i) { return hall.findIndex(function (q) { return q.id === h.id; }) === i; }));
   cur.pending = cur.pending.concat(pend.map(function (c) { return c.id; })).filter(function (id, i, a) { return a.indexOf(id) === i; }).slice(0, 16);
   Object.keys(inc.elites).forEach(function (k) { if (!cur.elites[k]) { var x = inc.elites[k]; x.skey = null; cur.elites[k] = x; } });
-  if (inc.board && cur.board && inc.board.skey === cur.board.skey) K.GOALS.forEach(function (g) { var a = cur.board[g[0]], b = inc.board[g[0]]; if (b && (!a || K.goalValue(g[0], b.cm) > K.goalValue(g[0], a.cm))) cur.board[g[0]] = b; });
+  // v17: an imported board for THESE settings replaces a board from other settings; boards are merged only when both match.
+  if (inc.board && inc.board.skey === skey && (!cur.board || cur.board.skey !== skey)) cur.board = inc.board;
+  else if (inc.board && cur.board && inc.board.skey === cur.board.skey) K.GOALS.forEach(function (g) { var a = cur.board[g[0]], b = inc.board[g[0]]; if (b && (!a || K.goalValue(g[0], b.cm) > K.goalValue(g[0], a.cm))) cur.board[g[0]] = b; });
   else if (inc.board && !cur.board) cur.board = inc.board;
   cur.progress = inc.progress.map(function (p) { p.run = -1; return p; }).concat(cur.progress).slice(-500);
   cur.log = cur.log.concat(inc.log.map(function (l) { l.name = l.name + ' (imported)'; return l; })).slice(0, 10);
@@ -1069,7 +1076,8 @@ K.adapt = function (stale) { return { rate: Math.min(0.9, 0.3 + 0.06 * stale), n
 
 // ---------- search engine (pure, steppable) ----------
 // Phases per generation: short look (3 sessions each) → race (top 16 get 6 more) → full confirmation (top 8)
-// → martingale check → holdout (challenger vs record on 60 fresh, unseen seeds) → breed.
+// → martingale check → holdout (challenger vs record on 60 fresh, unseen seeds; v17: extended to up to 420 paired
+// sessions before the deep check) → breed.
 K.SHORT = 3; K.RACE_N = 16; K.RACE_EXTRA = 6;
 K.Search = function (S, rank, hall, seed, memory) {
   this.S = S; K.vS = S; this.rank = rank || K.DEFAULT_RANK; this.max = K.maxCond(S); var mx = this.max; this.injected = [];
@@ -1262,6 +1270,24 @@ K.Search.prototype.planHoldout = function () {
 // Gate: the challenger must beat the record's score on the same fresh holdout rolls.
 // v7: an Analyst challenger under the Last + green focus is compared on the combined objective (both cards, same holdout rolls).
 K.holdoutPass = function (ch, rec, rank, S) { if (!K.breachOK(ch.hm)) return false; if (!rec) return true; var o = K.objFor(ch, rank, S); return K.key(ch, ch.hm, o, S) > K.key(rec, rec.hm, o, S) + 1e-9; };
+// v17 sequential holdout: a challenger that beat the record on the 60 holdout sessions keeps playing paired sessions
+// (challenger and record on the same fresh seeds) in stages of K.HX_STEP up to K.HX_MAX in total. After each stage it is
+// dropped when the gain is clearly below what the 5,000-session deep check needs (gain + K.HX_ZREJ x se < Min gain); after the
+// last stage the point gain must reach K.HX_PASS x Min gain. The deep check (unchanged) still decides; this only stops sending
+// it lucky 60-session winners, which used to fail it ~85% of the time and took about half of all compute.
+K.HX_ON = true; K.HX_STEP = 120; K.HX_MAX = 420; K.HX_ZREJ = 1.0; K.HX_PASS = 1.0; K.HX_B = 20;
+K.Search.prototype.holdExtend = function (ch, h) {
+  var S = this.S, o = K.objFor(ch, this.rank, S), rec = h.rec, n = ch.hruns.length, margin = K.minGain(S), out = { n: n, diff: 0, se: 0, pass: true, stage: 0 };
+  var rc = ch.hruns.slice(), rr = rec.hruns.slice(), cc = K.sanitizeCard(JSON.parse(JSON.stringify(ch))), rcard = K.sanitizeCard(JSON.parse(JSON.stringify(rec)));
+  while (n < K.HX_MAX) { var to = Math.min(K.HX_MAX, n + K.HX_STEP);
+    for (var i = n; i < to; i++) { var sd = (h.seed + i * 2246822519) >>> 0, a = K.session(cc, S, K.rng(sd)), b = K.session(rcard, S, K.rng(sd)); if (a.clamps) { ch.inv = ch.inv || 'clamp event in a scored session'; out.pass = false; out.why = 'clamp'; } rc.push(a); rr.push(b); }
+    this.holdExtra = (this.holdExtra || 0) + 2 * (to - n); n = to; out.stage++;
+    var d = K.key(ch, K.aggregate(rc), o, S) - K.key(rec, K.aggregate(rr), o, S), B = Math.max(2, Math.floor(n / K.HX_B)), bc = K.batchScores(rc, ch, o, S, B), br = K.batchScores(rr, rec, o, S, B), t = K.gainTest(d, bc, br, true, margin);
+    out.n = n; out.diff = d; out.se = t.se;
+    if (!out.pass || !K.breachOK(K.aggregate(rc)) || d + K.HX_ZREJ * t.se < margin) { out.pass = false; break; } }
+  if (out.pass && out.diff < K.HX_PASS * margin) out.pass = false;
+  ch.hx = { n: out.n, diff: out.diff, se: out.se, pass: out.pass };
+  return out; };
 K.Search.prototype.finishGen = function () {
   var self = this, S = this.S, rank = this.rank, mem = this.mem, skey = this.skey;
   var conf = this.confirm.slice().sort(function (a, b) { return K.key(b, b.cm, rank, S) - K.key(a, a.cm, rank, S); });
@@ -1269,6 +1295,7 @@ K.Search.prototype.finishGen = function () {
   if (h) {
     var ch = h.challenger, pass = K.holdoutPass(ch, h.rec, rank, S);
     this.lastHold = { name: ch.name, src: ch.src || null, pass: pass, ch: K.score(ch.hm, rank), rec: h.rec ? K.score(h.rec.hm, rank) : null };
+    if (pass && h.rec && K.HX_ON) { var hx = this.holdExtend(ch, h); this.lastHold.ext = hx; if (!hx.pass) { pass = false; this.lastHold.pass = false; this.holdExtFail = (this.holdExtFail || 0) + 1; } }
     if (pass) { var tch = this.trimChallenger(ch, h.rec, h); if (tch !== ch) this.lastHold.trim = tch.trim; this.lastHold.gate = this.gateEnqueue(tch, h.rec) ? 'queued' : 'dropped'; this.stale++; this.runStale++; if (h.rec && this.record && this.record.id === h.rec.id) this.record.hm = h.rec.hm; }
     else { this.rejected++; this.stale++; this.runStale++; if (h.rec && this.record && this.record.id === h.rec.id) this.record.hm = h.rec.hm; }
   } else { this.stale++; this.runStale++; }
@@ -1278,7 +1305,7 @@ K.Search.prototype.finishGen = function () {
   if (mem) { var anNotes = [];
     conf.forEach(function (c) { if (c.src !== 'analyst' || !c.cm) return; var isCh = h && h.challenger === c;
       var txt = 'Full confirmation: life ' + (c.cm.life * 100).toFixed(1) + '%, ruin ' + (c.cm.ruin * 100).toFixed(1) + '%, drop ' + (c.cm.drop * 100).toFixed(1) + '% over ' + c.cm.n + ' sessions. ' +
-        (isCh ? (self.lastHold.pass ? 'It then beat the record on ' + K.HOLDOUT + ' fresh holdout sessions (' + self.lastHold.ch.toFixed(3) + (self.lastHold.rec != null ? ' vs ' + self.lastHold.rec.toFixed(3) : '') + ') and ' + (self.lastHold.gate === 'queued' ? 'was sent to the automatic ' + K.DEEP_N.toLocaleString('en-US') + '-session deep check before it can become the record. ' : 'was dropped from the full deep-check queue (2 stronger challengers were waiting). ') : 'It reached the holdout but did not beat the record on ' + K.HOLDOUT + ' fresh sessions (' + self.lastHold.ch.toFixed(3) + ' vs ' + (self.lastHold.rec != null ? self.lastHold.rec.toFixed(3) : '–') + '), so the record stays. ') : 'It did not out-score the field in confirmation, so it never reached the holdout. ') + 'It still pays the house price on every bet.';
+        (isCh ? (self.lastHold.pass ? 'It then beat the record on ' + K.HOLDOUT + ' fresh holdout sessions (' + self.lastHold.ch.toFixed(3) + (self.lastHold.rec != null ? ' vs ' + self.lastHold.rec.toFixed(3) : '') + ') and ' + (self.lastHold.gate === 'queued' ? 'was sent to the automatic ' + K.DEEP_N.toLocaleString('en-US') + '-session deep check before it can become the record. ' : 'was dropped from the full deep-check queue (2 stronger challengers were waiting). ') : self.lastHold.ext && self.lastHold.ext.stage ? 'It beat the record on the first ' + K.HOLDOUT + ' fresh holdout sessions, but over ' + self.lastHold.ext.n + ' paired sessions its gain was only ' + (self.lastHold.ext.diff >= 0 ? '+' : '−') + Math.abs(self.lastHold.ext.diff).toFixed(4) + ' (needs ' + K.minGain(S) + '), so it was stopped before the deep check (v17 extended holdout: early luck). ' : 'It reached the holdout but did not beat the record on ' + K.HOLDOUT + ' fresh sessions (' + self.lastHold.ch.toFixed(3) + ' vs ' + (self.lastHold.rec != null ? self.lastHold.rec.toFixed(3) : '–') + '), so the record stays. ') : 'It did not out-score the field in confirmation, so it never reached the holdout. ') + 'It still pays the house price on every bet.';
       anNotes.push({ note: { kind: 'pipeline', q: 'How did the analyst’s card ' + c.name + ' do in the pipeline?', card: c.name, tried: 'Sent from Analyst into the normal confirmation and holdout.', result: txt, verdict: isCh && self.lastHold.pass ? 'deep check pending' : 'not promoted', n: c.cm.n } }); });
     (this.gate ? this.gate.notes.splice(0) : []).forEach(function (n) { anNotes.push({ note: n }); });
     anNotes.forEach(function (x) { mem.analyst = K.analystAbsorb(mem.analyst, x, { run: mem.runs, gen: self.gen }, S); }); }
@@ -1310,7 +1337,7 @@ K.Search.prototype.finishGen = function () {
     var nk = Object.keys(mem.seenNiches); if (nk.length > K.NICHE_MAX) nk.slice(0, nk.length - K.NICHE_MAX).forEach(function (k) { delete mem.seenNiches[k]; });
     var sk = Object.keys(mem.seenFams); if (sk.length > 400) { sk.sort(function (a, b) { return mem.seenFams[a] - mem.seenFams[b]; }); sk.slice(0, sk.length - 400).forEach(function (k) { delete mem.seenFams[k]; }); }
   }
-  var out = { learn: K.learnSummary(this.L, S), metric: { fams: pm.fams, newFams: pm.newFams, recVariants: pm.recVariants, novelSeats: pm.novelSeats, niches: pm.niches, newNiches: pm.newNiches, seenNiches: pm.seenNiches, famSpace: pm.famSpace, reseeds: this.reseeds || 0, seat: this.seatTot || null, rate: this.rateLast, level: (S && S.exploration) || 'Balanced' }, novel: mem ? mem.novel : [], gen: this.gen, sessions: this.sessions, stale: this.stale, runStale: this.runStale, improved: improved, record: this.record, pinned: K.pinned(this.record, S), hall: this.hall, list: list, history: this.history, mart: this.mart.m, memory: mem, families: fams, rejected: this.rejected, hold: this.lastHold, gate: this.gateStatus() };
+  var out = { learn: K.learnSummary(this.L, S), metric: { fams: pm.fams, newFams: pm.newFams, recVariants: pm.recVariants, novelSeats: pm.novelSeats, niches: pm.niches, newNiches: pm.newNiches, seenNiches: pm.seenNiches, famSpace: pm.famSpace, reseeds: this.reseeds || 0, seat: this.seatTot || null, rate: this.rateLast, level: (S && S.exploration) || 'Balanced' }, novel: mem ? mem.novel : [], gen: this.gen, sessions: this.sessions, stale: this.stale, runStale: this.runStale, improved: improved, record: this.record, pinned: K.pinned(this.record, S), hall: this.hall, list: list, history: this.history, mart: this.mart.m, memory: mem, families: fams, rejected: this.rejected, holdExtFail: this.holdExtFail || 0, ceiling: K.ceilingNote(S), hold: this.lastHold, gate: this.gateStatus() };
   if (this.L) { var ex = [], hd = this.hold; if (hd) hd.queue.forEach(function (c) { if (c.hm) ex.push({ c: c, m: c.hm }); });
     if (this.record && this.record.gd && this.record.gd.n && this._gdSeen !== this.record.id) { this._gdSeen = this.record.id; var g0 = this.record.gd; ex.push({ c: this.record, m: { n: g0.n, life: g0.life.m != null ? g0.life.m : g0.life, played: g0.played, ruin: g0.ruin.p, green: g0.green.p, drop: g0.drop.m, dropP95: g0.dropP95, breach: g0.breach.p, priced: g0.priced, sample: g0.net.m } }); }
     this.lR = this.lR || { rows: [] }; var t0 = Date.now(); K.learnFromGen(this.L, this.pop, this.confirm || [], this.rank, this.S, this.lR, ex); this.learnStep(); this.fireStep(); this.learnMs = (this.learnMs || 0) + Date.now() - t0; }
@@ -1395,6 +1422,21 @@ K.goalMutate = function (c, r, max) { if (!c) return c; max = max == null ? 35 :
   K.randomCard = function (r, max) { var c = rc.apply(null, arguments); if (max == null) max = 20; var wt = max >= 1 && K.goalWant(r, 'tp', K.GOAL_P * 0.7), ws = max >= 1 && K.goalWant(r, 'sl', K.GOAL_P * 0.6); if (wt || ws) { var x = K.clone(c); x.name = c.name; K.setGoal(x, wt ? K.goalDraw(r, 'tp') : null, ws ? K.goalDraw(r, 'sl') : null); K.trimCard(x, max); c = fin(x); } return c; };
   K.mutate = function (c, r, rate, max) { var x = mu.apply(null, arguments); if (r() < 0.5) { var y = K.goalMutate(JSON.parse(JSON.stringify(x)), r, max == null ? 35 : max); x = fin(y); } return x; };
   K.cross = function (a, b, r, max) { var x = cr.apply(null, arguments), g = K.goalOf(x), n = x.blocks.filter(function (q) { return K.isTP(q); }).length + x.blocks.filter(function (q) { return K.isSL(q); }).length; if (n > (g.tp != null) + (g.sl != null)) { K.setGoal(x, g.tp, g.sl); x = fin(x); } return x; };
+})();
+// v17 Cushion family: play at a lively win chance A while the session is down less than Y of the bank, switch to a safe
+// win chance B once it is down more than Y (and, optionally, once it is up G or more), back to A when it recovers.
+// Only Stake Net Gain conditions + set/reset win chance (always Stake-valid; the bet never changes). Bench (v17): at
+// $10 / 1% the best of this family scores ~1.26 on Last + green $ vs ~1.14 for the best flat card and 1.17 for the
+// average v16.1 search result; the search tunes A, Y, B and G from there like any other card.
+K.centThr = function (frac, bank) { bank = bank > 0 ? bank : 10; var d = Math.max(0.01, Math.round(frac * bank * 100) / 100); return d / bank; };
+K.cushion = function (name, A, Y, B, G) { var bank = (K.vS && K.vS.bank) || K.DEFAULTS.bank, N = function (metric, cmp, thr, action, value) { return { kind: 'net', metric: metric, cmp: cmp, thr: K.centThr(thr, bank), action: action, value: value || 0 }; };
+  var bl = [N('loss', 'lower than or equal', Y, 'reset win chance'), N('loss', 'greater than', Y, 'set win chance', B)]; if (G) bl.push(N('net gain', 'greater than or equal', G, 'set win chance', B));
+  return K.mk(name, A, 'under', bl); };
+K.CUSHION_P = 0.08;
+K.cushionDraw = function (r, max) { var A = Math.round((45 + r() * 30) * 100) / 100, Y = 0.05 + r() * 0.35, B = r() < 0.6 ? 98 : Math.round((85 + r() * 13) * 100) / 100, G = max >= 3 && r() < 0.5 ? 0.1 + r() * 0.4 : null;
+  var c = K.cushion('Cushion', A, Y, B, G); c.dir = r() < 0.5 ? 'under' : 'over'; return c; };
+(function () { var rc = K.randomCard;
+  K.randomCard = function (r, max) { var c = rc.apply(null, arguments), m = max == null ? 20 : max; if (m >= 2 && r() < K.CUSHION_P) { var x = K.cushionDraw(r, m); x.name = c.name; x.id = c.id; if (K.stakeStatic(x, K.vS || K.DEFAULTS).length) return c; return x; } return c; };
 })();
 // settings similarity for transfer: bet size as share of bank, edge, bets, max drop
 K.skeyVec = function (k) { var p = String(k).split('|').map(Number); return [Math.log((p[1] || 1) / 100), p[2] || 1, Math.log(p[3] || 1000), (p[6] || 50) / 100]; };
@@ -2449,7 +2491,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
       if (!localStorage.getItem(LS_V161)) { lsSet(LS_V161, '1'); if (r === K.LG) { rankNotice = 'Default ranking is now Last + green $ (dollar-weighted green: winning small often and losing big no longer scores well). Your ranking was Last + green and has been switched; pick Last + green again under Ranking to go back. The old record stays in memory and must pass the deep check again under the new ranking.'; r = K.DEFAULT_RANK; lsSet(LS_RANK, r); } }
     } catch (e) {}
     return K.RANKS.indexOf(r) >= 0 ? r : K.DEFAULT_RANK; }
-  function loadSettings() { try { var s = JSON.parse(localStorage.getItem(LS_SET)); if (s) s.custom = K.sanitizeCustom(s.custom); if (s) delete s.minStop; if (s && s.maxCond == null) s.maxCond = 20; if (s && s.maxDrop == null) s.maxDrop = 50; if (s && s.minGain == null) s.minGain = K.MIN_GAIN; if (s && !K.EXPLORE[s.exploration]) s.exploration = 'Balanced'; if (s && (!s.analyst || typeof s.analyst !== 'object')) s.analyst = { on: true, pace: 'Normal' }; if (s && !K.validate(s)) return s; } catch (e) {} return Object.assign({}, K.DEFAULTS, { custom: K.sanitizeCustom(null), analyst: { on: true, pace: 'Normal', focus: 'lastgreen' } }); }
+  function loadSettings() { try { var s = JSON.parse(localStorage.getItem(LS_SET)); if (s) s.custom = K.sanitizeCustom(s.custom); if (s) delete s.minStop; if (s && s.maxCond == null) s.maxCond = 20; if (s && s.maxDrop == null) s.maxDrop = 50; if (s && s.minGain == null) s.minGain = K.MIN_GAIN; if (s && !K.EXPLORE[s.exploration]) s.exploration = 'Balanced'; if (s && (!s.analyst || typeof s.analyst !== 'object')) s.analyst = { on: true, pace: 'Normal' }; if (s && K.fieldErrors(s).firstPct && isFinite(Number(s.bank)) && Number(s.bank) >= 1 && Number(s.firstPct) >= 0.1) s.firstPct = K.minFirstPct(Number(s.bank)); if (s && !K.validate(s)) return s; } catch (e) {} return Object.assign({}, K.DEFAULTS, { custom: K.sanitizeCustom(null), analyst: { on: true, pace: 'Normal', focus: 'lastgreen' } }); }
   function loadHall() { try { var mx = K.maxCond(settings); return K.sanitizeHall(JSON.parse(localStorage.getItem(LS_HALL)) || []).map(function (h) { return K.trimCard(h, mx); }); } catch (e) { return []; } }
   function loadMemory() { var m; try { m = JSON.parse(localStorage.getItem(LS_MEM)); } catch (e) { m = null; }
     m = K.sanitizeMemory(m); if (!m.hall.length) m.hall = loadHall(); return m; }
@@ -2548,7 +2590,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
     paintT = null; lastPaint = Date.now(); if (!latest) return;
     lsSet(LS_HALL, JSON.stringify(latest.hall));
     if (latest.memory) { lsSet(LS_MEM, JSON.stringify(latest.memory)); paintMemory(latest.memory); memDeep = latest.memory.deep || {}; }
-    $('stale').textContent = latest.runStale ? 'No better card for ' + latest.runStale + ' generation' + (latest.runStale === 1 ? '' : 's') + ' this run.' : 'New record this generation.';
+    $('stale').textContent = latest.runStale ? 'No better card for ' + latest.runStale + ' generation' + (latest.runStale === 1 ? '' : 's') + ' this run.' + (latest.runStale >= 25 ? (latest.ceiling ? ' Plateau at the edge ceiling: the house price already uses about your whole Max drop budget, so the record is near the best these settings allow. A smaller first bet % or a higher Max drop gives room.' : ' Plateau, not stuck: the search is still testing new cards every generation, but each must beat the record by the Min gain on hundreds of fresh sessions and then 5,000 more. Long flat stretches are normal once a strong card holds the record; nothing beats the house edge.') : '') : 'New record this generation.';
     var mt = latest.metric; if (mt) $('famline').textContent = 'Families this gen: ' + mt.fams + ' · new families this run: ' + mt.newFams + (mt.famSpace >= 100 && !mt.newFams ? ' (all ' + mt.famSpace + ' broad families already explored)' : '') + (mt.newNiches != null ? ' · new niches this run: ' + mt.newNiches + ' (' + mt.seenNiches + ' tried before)' : '') + ' · variants of record: ' + mt.recVariants + ' · ' + K.exploreLine({ exploration: mt.level }, mt.seat) + (mt.level && mt.level !== (settings.exploration || 'Balanced') ? ' (' + settings.exploration + ' selected: applies on New run)' : '') + (mt.reseeds ? ' · reseeds ' + mt.reseeds : '');
     paintList(); paintChart(); paintPinned(latest.record); paintGate(latest.gate || null); paintMemPanels(latest.memory); if (latest.memory) paintAnalyst(latest.memory.analyst);
     // auto-simplify the newest record only (an older record's unfinished auto run is cancelled)
@@ -2556,7 +2598,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && s
     if (nr && latest.record && nr.id === latest.record.id && nr.blocks.length && !simpRes[nr.id] && !taskFor(nr.id, 'simplify')) {
       Object.keys(tasks).forEach(function (k) { var t = tasks[k]; if (t.auto && t.kind === 'simplify') { taskWorker.postMessage({ type: 'cancel', id: k }); delete tasks[k]; } });
       runTask('simplify', nr, true); }
-    $('rejects').textContent = latest.rejected ? latest.rejected + ' challenger' + (latest.rejected === 1 ? '' : 's') + ' failed the holdout this run' : '';
+    $('rejects').textContent = latest.rejected ? latest.rejected + ' challenger' + (latest.rejected === 1 ? '' : 's') + ' failed the holdout this run' + (latest.holdExtFail ? ' (' + latest.holdExtFail + ' of them won the first 60 sessions by luck and faded over the extended holdout)' : '') : '';
   }
   function metric(c) { return c.cm || c.m; }
   function paintList() {
